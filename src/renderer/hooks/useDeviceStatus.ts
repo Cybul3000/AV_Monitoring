@@ -20,6 +20,11 @@ export function useDeviceStatus() {
     return entry?.status ?? 'GREY'
   }
 
+  function getDeviceMeta(deviceId: string): Record<string, unknown> {
+    const entry = broadcast?.statuses.find(s => s.deviceId === deviceId)
+    return entry?.meta ?? {}
+  }
+
   function getRoomLED(roomId: string): LEDStatus {
     return broadcast?.hierarchy.rooms[roomId] ?? 'GREY'
   }
@@ -39,6 +44,7 @@ export function useDeviceStatus() {
   return {
     broadcast,
     getDeviceStatus,
+    getDeviceMeta,
     getRoomLED,
     getFloorLED,
     getOfficeLED,

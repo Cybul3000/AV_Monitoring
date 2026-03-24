@@ -3,6 +3,10 @@ import { app } from 'electron'
 import { readFileSync, existsSync } from 'fs'
 import type { DeviceModule } from './_base/DeviceModule'
 import { alertRulesService } from '../services/AlertRulesService'
+import { ZoomModule } from './zoom/ZoomModule'
+import { LGDisplayModule } from './lg-display/LGDisplayModule'
+import { LightwareModule } from './lightware/LightwareModule'
+import { BiampTesiraModule } from './biamp-tesira/BiampTesiraModule'
 
 // Lazily-loaded module instances keyed by device type
 const _modules = new Map<string, DeviceModule>()
@@ -35,7 +39,7 @@ function getRegistryPath(): string {
   // In production, extraResources copies it to resources/device-registry.json
   // In dev, use the repo resources/ folder
   const prodPath = join(process.resourcesPath, 'device-registry.json')
-  const devPath = join(app.getAppPath(), '../../resources/device-registry.json')
+  const devPath = join(app.getAppPath(), 'resources/device-registry.json')
   if (existsSync(prodPath)) return prodPath
   return devPath
 }
@@ -98,16 +102,11 @@ export function onDeviceCreated(deviceType: string): void {
 /** Register all implemented modules. Add new modules here as they are developed. */
 export function registerAllModules(): void {
   // Zoom module
-  const { ZoomModule } = require('./zoom/ZoomModule')
   registerModule('zoom-room', () => new ZoomModule())
 
-  // Future modules (uncomment when implemented):
-  // const { LGDisplayModule } = require('./lg-display/LGDisplayModule')
-  // registerModule('lg-display', () => new LGDisplayModule())
+  registerModule('lg-display', () => new LGDisplayModule())
   // const { CrestronSSHModule } = require('./crestron-ssh/CrestronSSHModule')
   // registerModule('crestron-ssh', () => new CrestronSSHModule())
-  // const { LightwareModule } = require('./lightware-matrix/LightwareModule')
-  // registerModule('lightware-matrix', () => new LightwareModule())
-  // const { BiampTesiraModule } = require('./biamp-tesira/BiampTesiraModule')
-  // registerModule('biamp-tesira', () => new BiampTesiraModule())
+  registerModule('lightware-matrix', () => new LightwareModule())
+  registerModule('biamp-tesira', () => new BiampTesiraModule())
 }

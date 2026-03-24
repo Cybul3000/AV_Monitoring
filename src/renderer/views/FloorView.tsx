@@ -29,6 +29,12 @@ export const FloorView: React.FC<Props> = ({ regionId, officeId, floorId, onNavi
   const rooms = floor.children ?? []
   const hasFloorMap = !!floor.floorMapPath
 
+  const handleUploadFloorMap = async () => {
+    const filePath = await (window.api as unknown as { selectFile: () => Promise<string | null> }).selectFile?.()
+    if (!filePath) return
+    await update({ action: 'update', type: 'floor', id: floorId, data: { name: floor.name, level: floor.level, floorMapPath: filePath } })
+  }
+
   const handleAddRoom = async () => {
     if (!newRoomName.trim()) return
     await update({ action: 'create', type: 'room', parentId: floorId, data: { name: newRoomName.trim() } })
@@ -41,12 +47,16 @@ export const FloorView: React.FC<Props> = ({ regionId, officeId, floorId, onNavi
       <header style={styles.header}>
         <h2 style={styles.title}>{floor.name}</h2>
         <div style={{ display: 'flex', gap: 'var(--spacing-sm)', alignItems: 'center' }}>
-          {hasFloorMap && (
+          {hasFloorMap ? (
             <button
               style={{ ...styles.toggleBtn, background: viewMode === 'map' ? 'var(--color-accent)' : 'transparent' }}
               onClick={() => setViewMode(viewMode === 'map' ? 'list' : 'map')}
             >
               {viewMode === 'map' ? 'List View' : 'Map View'}
+            </button>
+          ) : (
+            <button style={styles.toggleBtn} onClick={() => void handleUploadFloorMap()}>
+              Upload Floor Plan
             </button>
           )}
           <button style={styles.addBtn} onClick={() => setShowAdd(true)}>+ Add Room</button>
@@ -120,7 +130,7 @@ const styles = {
   center: { display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' },
   row: { display: 'flex', alignItems: 'center', gap: 'var(--spacing-md)', padding: 'var(--spacing-md)', background: 'var(--color-bg-surface)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', cursor: 'pointer', textAlign: 'left' as const },
   addBtn: { padding: '8px 16px', background: 'var(--color-accent)', color: '#fff', border: 'none', borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-sm)', fontWeight: 600, cursor: 'pointer' },
-  toggleBtn: { padding: '6px 14px', color: 'var(--color-text-primary)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-sm)', cursor: 'pointer' },
+  toggleBtn: { padding: '6px 14px', background: 'transparent', color: 'var(--color-text-primary)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-sm)', cursor: 'pointer' },
   cancelBtn: { padding: '6px 14px', background: 'transparent', color: 'var(--color-text-secondary)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-sm)', cursor: 'pointer' },
   confirmBtn: { padding: '6px 14px', background: 'var(--color-accent)', color: '#fff', border: 'none', borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-sm)', fontWeight: 600, cursor: 'pointer' },
   overlay: { position: 'fixed' as const, inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 },

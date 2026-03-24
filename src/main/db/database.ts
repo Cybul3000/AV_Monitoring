@@ -13,6 +13,9 @@ function getDbPath(): string {
 }
 
 function getMigrationsDir(): string {
+  if (!app.isPackaged) {
+    return join(process.cwd(), 'src/main/db/migrations')
+  }
   return join(__dirname, 'migrations')
 }
 
@@ -46,7 +49,8 @@ function applyMigrations(db: Database.Database): void {
   const migrationFiles = [
     { version: 1, file: '001_initial.sql' },
     { version: 2, file: '002_alert_rules.sql' },
-    { version: 3, file: '003_zoom_location.sql' }
+    { version: 3, file: '003_zoom_location.sql' },
+    { version: 4, file: '004_biamp_configs.sql' }
   ]
 
   for (const migration of migrationFiles) {

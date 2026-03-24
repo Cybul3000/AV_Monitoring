@@ -1,4 +1,4 @@
-import { app, BrowserWindow, Menu } from 'electron'
+import { app, BrowserWindow, Menu, protocol, net } from 'electron'
 import { join } from 'path'
 import { initDatabase, closeDatabase } from './db/database'
 import { registerAllModules } from './modules/index'
@@ -16,6 +16,11 @@ import { buildMenu } from './menu'
 import { createTray } from './tray'
 import { getPreference, setPreference } from './preferences'
 
+// Must be called before app is ready
+protocol.registerSchemesAsPrivileged([
+  { scheme: 'local-file', privileges: { secure: true, supportFetchAPI: true } }
+])
+
 let mainWindow: BrowserWindow | null = null
 
 function createWindow(): void {
@@ -31,7 +36,7 @@ function createWindow(): void {
     show: false,
     titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
     webPreferences: {
-      preload: join(__dirname, '../preload/index.js'),
+      preload: join(__dirname, '../preload/preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: false
@@ -85,6 +90,12 @@ function createWindow(): void {
 }
 
 app.whenReady().then(() => {
+  // Allow renderer to load local files via local-file:// scheme
+  protocol.handle('local-file', (request) => {
+    const filePath = decodeURIComponent(request.url.slice('local-file://'.length))
+    return net.fetch(`file://${filePath}`)
+  })
+
   // Initialise data layer
   initDatabase()
   registerAllModules()

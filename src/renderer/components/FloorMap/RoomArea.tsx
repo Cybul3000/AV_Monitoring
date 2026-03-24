@@ -16,99 +16,152 @@ interface Props {
   onMove: (x: number, y: number, w: number, h: number) => void
 }
 
-export const RoomArea: React.FC<Props> = ({ room, ledStatus, editMode, onClick, onMove }) => {
-  const x = room.mapX ?? 10
-  const y = room.mapY ?? 10
-  const w = room.mapW ?? 20
-  const h = room.mapH ?? 15
+type DragType = 'move' | 'resize'
 
-  const dragRef = useRef<{ startX: number; startY: number; origX: number; origY: number } | null>(null)
+export const RoomArea: React.FC<Props> = ({ room, ledStatus, editMode, onClick, onMove }) => {
+  const initX = room.mapX ?? 5
+  const initY = room.mapY ?? 5
+  const initW = room.mapW ?? 8
+  const initH = room.mapH ?? 6
+
+  const [pos, setPos] = useState({ x: initX, y: initY, w: initW, h: initH })
+  const posRef = useRef({ x: initX, y: initY, w: initW, h: initH })
   const [dragging, setDragging] = useState(false)
-  const [pos, setPos] = useState({ x, y, w, h })
+  const dragRef = useRef<{
+    type: DragType
+    startX: number; startY: number
+    origX: number; origY: number; origW: number; origH: number
+  } | null>(null)
 
   const ledColour = LED_COLOURS[ledStatus] ?? LED_COLOURS.GREY
+  const HANDLE_SIZE = 2.5
+  const MIN_SIZE = 6
 
-  const handleMouseDown = (e: React.MouseEvent<SVGRectElement>) => {
-    if (!editMode) {
-      onClick()
-      return
-    }
-    e.stopPropagation()
-    const svg = (e.currentTarget.ownerSVGElement as SVGSVGElement)
+  const toSvgPoint = (svg: SVGSVGElement, clientX: number, clientY: number) => {
     const pt = svg.createSVGPoint()
-    pt.x = e.clientX
-    pt.y = e.clientY
-    const svgPt = pt.matrixTransform(svg.getScreenCTM()!.inverse())
-    dragRef.current = { startX: svgPt.x, startY: svgPt.y, origX: pos.x, origY: pos.y }
+    pt.x = clientX
+    pt.y = clientY
+    return pt.matrixTransform(svg.getScreenCTM()!.inverse())
+  }
+
+  const startDrag = (e: React.MouseEvent<SVGElement>, type: DragType) => {
+    if (!editMode) return
+    e.stopPropagation()
+    const svg = e.currentTarget.ownerSVGElement as SVGSVGElement
+    const svgPt = toSvgPoint(svg, e.clientX, e.clientY)
+    dragRef.current = {
+      type, startX: svgPt.x, startY: svgPt.y,
+      origX: pos.x, origY: pos.y, origW: pos.w, origH: pos.h
+    }
     setDragging(true)
 
-    const onMove = (me: MouseEvent) => {
+    const handleMouseMove = (me: MouseEvent) => {
       if (!dragRef.current) return
-      const mPt = svg.createSVGPoint()
-      mPt.x = me.clientX
-      mPt.y = me.clientY
-      const mSvg = mPt.matrixTransform(svg.getScreenCTM()!.inverse())
-      const dx = mSvg.x - dragRef.current.startX
-      const dy = mSvg.y - dragRef.current.startY
-      setPos(p => ({
-        ...p,
-        x: Math.max(0, Math.min(100 - p.w, dragRef.current!.origX + dx)),
-        y: Math.max(0, Math.min(100 - p.h, dragRef.current!.origY + dy))
-      }))
+      const mPt = toSvgPoint(svg, me.clientX, me.clientY)
+      const dx = mPt.x - dragRef.current.startX
+      const dy = mPt.y - dragRef.current.startY
+      const { origX, origY, origW, origH } = dragRef.current
+
+      if (dragRef.current.type === 'move') {
+        const next = {
+          x: Math.max(0, Math.min(100 - posRef.current.w, origX + dx)),
+          y: Math.max(0, Math.min(100 - posRef.current.h, origY + dy)),
+          w: posRef.current.w,
+          h: posRef.current.h
+        }
+        posRef.current = next
+        setPos(next)
+      } else {
+        const next = {
+          x: posRef.current.x,
+          y: posRef.current.y,
+          w: Math.max(MIN_SIZE, Math.min(100 - origX, origW + dx)),
+          h: Math.max(MIN_SIZE, Math.min(100 - origY, origH + dy))
+        }
+        posRef.current = next
+        setPos(next)
+      }
     }
 
-    const onUp = () => {
+    const handleMouseUp = () => {
       setDragging(false)
       dragRef.current = null
-      setPos(p => {
-        onMove(p.x, p.y, p.w, p.h)
-        return p
-      })
-      window.removeEventListener('mousemove', onMove)
-      window.removeEventListener('mouseup', onUp)
+      onMove(posRef.current.x, posRef.current.y, posRef.current.w, posRef.current.h)
+      window.removeEventListener('mousemove', handleMouseMove)
+      window.removeEventListener('mouseup', handleMouseUp)
     }
 
-    window.addEventListener('mousemove', onMove)
-    window.addEventListener('mouseup', onUp)
+    window.addEventListener('mousemove', handleMouseMove)
+    window.addEventListener('mouseup', handleMouseUp)
+  }
+
+  const handleBodyMouseDown = (e: React.MouseEvent<SVGRectElement>) => {
+    if (!editMode) { onClick(); return }
+    startDrag(e, 'move')
   }
 
   const { x: px, y: py, w: pw, h: ph } = pos
+  const deviceCount = room.children?.length ?? 0
 
   return (
     <g>
+      {/* Room body */}
       <rect
-        x={px}
-        y={py}
-        width={pw}
-        height={ph}
+        x={px} y={py} width={pw} height={ph}
         fill={`${ledColour}22`}
         stroke={ledColour}
         strokeWidth={dragging ? 0.5 : 0.3}
         rx={0.5}
         style={{ cursor: editMode ? 'move' : 'pointer' }}
-        onMouseDown={handleMouseDown}
+        onMouseDown={handleBodyMouseDown}
       />
-      {/* LED indicator dot */}
-      <circle cx={px + 1.5} cy={py + 1.5} r={0.8} fill={ledColour} />
-      {/* Room label */}
-      <foreignObject x={px + 0.5} y={py + 2.5} width={pw - 1} height={ph - 3} style={{ overflow: 'hidden' }}>
-        <div
-          style={{
-            fontSize: '2px',
-            color: 'var(--color-text-primary)',
-            fontWeight: 600,
-            whiteSpace: 'nowrap',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            padding: '0.2px 0.3px'
-          }}
-        >
-          {room.name}
-        </div>
-        <div style={{ fontSize: '1.5px', color: 'var(--color-text-muted)', padding: '0.1px 0.3px' }}>
-          {room.children?.length ?? 0} device{room.children?.length !== 1 ? 's' : ''}
-        </div>
-      </foreignObject>
+
+      {/* LED dot */}
+      <circle cx={px + 1.5} cy={py + 1.5} r={0.7} fill={ledColour} />
+
+      {/* Room name — SVG text scales with zoom */}
+      <text
+        x={px + 2.8}
+        y={py + 2.2}
+        fontSize={2}
+        fontWeight="600"
+        fill="var(--color-text-primary)"
+        style={{ pointerEvents: 'none', userSelect: 'none' }}
+        clipPath={`url(#clip-${room.id})`}
+      >
+        {room.name}
+      </text>
+      <text
+        x={px + 2.8}
+        y={py + 4.5}
+        fontSize={1.6}
+        fill="var(--color-text-muted)"
+        style={{ pointerEvents: 'none', userSelect: 'none' }}
+      >
+        {deviceCount} device{deviceCount !== 1 ? 's' : ''}
+      </text>
+
+      {/* Clip path so label doesn't overflow the room rect */}
+      <defs>
+        <clipPath id={`clip-${room.id}`}>
+          <rect x={px + 2.8} y={py} width={pw - 4} height={ph} />
+        </clipPath>
+      </defs>
+
+      {/* Resize handle — bottom-right corner, only in edit mode */}
+      {editMode && (
+        <rect
+          x={px + pw - HANDLE_SIZE}
+          y={py + ph - HANDLE_SIZE}
+          width={HANDLE_SIZE}
+          height={HANDLE_SIZE}
+          fill={ledColour}
+          opacity={0.8}
+          rx={0.3}
+          style={{ cursor: 'se-resize' }}
+          onMouseDown={e => startDrag(e, 'resize')}
+        />
+      )}
     </g>
   )
 }

@@ -244,7 +244,8 @@ const styles = {
   },
   titleBar: {
     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-    padding: '0 var(--spacing-lg)',
+    paddingLeft: (window as unknown as { platform?: string }).platform === 'darwin' ? 80 : 'var(--spacing-lg)',
+    paddingRight: 'var(--spacing-lg)',
     height: 40, background: 'var(--color-bg-surface)',
     borderBottom: '1px solid var(--color-border)', flexShrink: 0,
     WebkitAppRegion: 'drag' as unknown as undefined

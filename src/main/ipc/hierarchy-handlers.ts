@@ -1,4 +1,4 @@
-import { ipcMain } from 'electron'
+import { ipcMain, dialog } from 'electron'
 import { randomUUID } from 'crypto'
 import { getDb } from '../db/database'
 import { onDeviceCreated } from '../modules/index'
@@ -13,6 +13,14 @@ import type {
 export function registerHierarchyHandlers(): void {
   ipcMain.handle('hierarchy:get', (): HierarchyResponse => {
     return { roots: buildHierarchyTree() }
+  })
+
+  ipcMain.handle('dialog:selectFile', async (_event, options?: { filters?: Electron.FileFilter[] }): Promise<string | null> => {
+    const result = await dialog.showOpenDialog({
+      properties: ['openFile'],
+      filters: options?.filters ?? [{ name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'svg'] }]
+    })
+    return result.canceled ? null : result.filePaths[0]
   })
 
   ipcMain.handle(

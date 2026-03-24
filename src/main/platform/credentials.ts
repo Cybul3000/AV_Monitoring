@@ -85,21 +85,22 @@ export interface ZoomAppCredentials {
   accountId: string
 }
 
+/** Persists only the non-secret fields. clientSecret is never written to disk. */
 export async function saveZoomAppCredentials(
   clientId: string,
-  clientSecret: string,
   accountId: string
 ): Promise<void> {
-  const value = JSON.stringify({ clientId, clientSecret, accountId })
+  const value = JSON.stringify({ clientId, accountId })
   await keytar.setPassword(SERVICE_PREFIX, 'zoom-app-credentials', value)
 }
 
-export async function getZoomAppCredentials(): Promise<ZoomAppCredentials | null> {
+/** Returns saved clientId + accountId. clientSecret is NOT stored — must be supplied per-session. */
+export async function getZoomAppCredentials(): Promise<Omit<ZoomAppCredentials, 'clientSecret'> | null> {
   const raw = await keytar.getPassword(SERVICE_PREFIX, 'zoom-app-credentials')
   if (!raw) return null
   try {
-    const parsed = JSON.parse(raw) as ZoomAppCredentials
-    if (parsed.clientId && parsed.clientSecret && parsed.accountId) return parsed
+    const parsed = JSON.parse(raw) as Partial<ZoomAppCredentials>
+    if (parsed.clientId && parsed.accountId) return { clientId: parsed.clientId, accountId: parsed.accountId }
     return null
   } catch {
     return null

@@ -134,15 +134,23 @@ const api = {
   }): Promise<{ success: boolean; error?: string }> =>
     ipcRenderer.invoke('zoom:saveCredentials', payload),
 
+  zoomGetCredentials: (): Promise<{ clientId: string; accountId: string; secretActive: boolean }> =>
+    ipcRenderer.invoke('zoom:getCredentials'),
+
   // ── Alert Rules ───────────────────────────────────────────────────────────
   alertGetRules: (req?: AlertRulesGetRequest): Promise<AlertRulesGetResponse> =>
     ipcRenderer.invoke('alert:getRules', req ?? {}),
 
   alertSetRule: (req: AlertRuleSetRequest): Promise<{ success: boolean; error?: string }> =>
-    ipcRenderer.invoke('alert:setRule', req)
+    ipcRenderer.invoke('alert:setRule', req),
+
+  // ── Dialogs ───────────────────────────────────────────────────────────────
+  selectFile: (options?: { filters?: Array<{ name: string; extensions: string[] }> }): Promise<string | null> =>
+    ipcRenderer.invoke('dialog:selectFile', options)
 }
 
 contextBridge.exposeInMainWorld('api', api)
+contextBridge.exposeInMainWorld('platform', process.platform)
 
 // Expose type for TypeScript in renderer
 export type Api = typeof api

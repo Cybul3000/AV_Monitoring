@@ -8,6 +8,7 @@ type ApiShape = {
   settingsExport: (req: { savePath?: string }) => Promise<{ success: boolean; filePath?: string; error?: string }>
   settingsImport: (req: { filePath: string }) => Promise<{ success: boolean; rulesApplied?: number; prefsApplied?: number; error?: string }>
   zoomSaveCredentials: (payload: { clientId: string; clientSecret: string; accountId: string }) => Promise<{ success: boolean; error?: string }>
+  zoomGetCredentials: () => Promise<{ clientId: string; accountId: string; secretActive: boolean }>
 }
 
 function api(): ApiShape {
@@ -33,6 +34,7 @@ export const SettingsView: React.FC = () => {
   const [zoomAccountId, setZoomAccountId] = useState('')
   const [zoomClientId, setZoomClientId] = useState('')
   const [zoomClientSecret, setZoomClientSecret] = useState('')
+  const [zoomSecretActive, setZoomSecretActive] = useState(false)
   const [zoomCredsSaved, setZoomCredsSaved] = useState(false)
   const [zoomCredsError, setZoomCredsError] = useState<string | null>(null)
 
@@ -47,11 +49,15 @@ export const SettingsView: React.FC = () => {
   useEffect(() => {
     const load = async () => {
       try {
-        const [pollRes, failRes, tooltipRes] = await Promise.all([
+        const [pollRes, failRes, tooltipRes, zoomRes] = await Promise.all([
           api().preferencesGet({ key: 'pref:pollIntervalDefault' }),
           api().preferencesGet({ key: 'pref:consecutiveFailuresBeforeRed' }),
-          api().preferencesGet({ key: 'pref:tooltipsEnabled' })
+          api().preferencesGet({ key: 'pref:tooltipsEnabled' }),
+          api().zoomGetCredentials()
         ])
+        setZoomAccountId(zoomRes.accountId)
+        setZoomClientId(zoomRes.clientId)
+        setZoomSecretActive(zoomRes.secretActive)
         if (typeof pollRes.value === 'number') {
           setPollInterval(Math.round((pollRes.value as number) / 1000))
         }
@@ -114,6 +120,8 @@ export const SettingsView: React.FC = () => {
       })
       if (res.success) {
         setZoomCredsSaved(true)
+        setZoomSecretActive(true)
+        setZoomClientSecret('')
         setTimeout(() => setZoomCredsSaved(false), 3000)
       } else {
         setZoomCredsError(res.error ?? 'Save failed')
@@ -239,47 +247,42 @@ export const SettingsView: React.FC = () => {
       <section style={styles.section}>
         <h3 style={styles.sectionTitle}>Zoom API Credentials</h3>
         <p style={styles.description}>
-          Server-to-Server OAuth credentials for importing Zoom Rooms and running speaker tests.
-          These are stored securely in your OS keychain.
+          Account ID and Client ID are saved to your OS keychain. Client Secret is
+          never stored — you must enter it each time the app starts.
         </p>
 
         <div style={styles.fieldRow}>
           <label style={styles.label} htmlFor="zoom-account-id">Account ID</label>
-          <input
-            id="zoom-account-id"
-            type="text"
-            style={styles.input}
-            value={zoomAccountId}
-            onChange={e => setZoomAccountId(e.target.value)}
-            placeholder="Account ID"
-            autoComplete="off"
-          />
+          <input id="zoom-account-id" type="text" style={styles.input}
+            value={zoomAccountId} onChange={e => setZoomAccountId(e.target.value)}
+            placeholder="Account ID" autoComplete="off" />
         </div>
 
         <div style={styles.fieldRow}>
           <label style={styles.label} htmlFor="zoom-client-id">Client ID</label>
-          <input
-            id="zoom-client-id"
-            type="text"
-            style={styles.input}
-            value={zoomClientId}
-            onChange={e => setZoomClientId(e.target.value)}
-            placeholder="Client ID"
-            autoComplete="off"
-          />
+          <input id="zoom-client-id" type="text" style={styles.input}
+            value={zoomClientId} onChange={e => setZoomClientId(e.target.value)}
+            placeholder="Client ID" autoComplete="off" />
         </div>
 
         <div style={styles.fieldRow}>
-          <label style={styles.label} htmlFor="zoom-client-secret">Client Secret</label>
-          <input
-            id="zoom-client-secret"
-            type="password"
-            style={styles.input}
-            value={zoomClientSecret}
-            onChange={e => setZoomClientSecret(e.target.value)}
-            placeholder="Client Secret"
-            autoComplete="new-password"
-          />
+          <label style={styles.label} htmlFor="zoom-client-secret">
+            <div>Client Secret</div>
+            <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-amber)', fontWeight: 400, marginTop: 2 }}>
+              Session only — not saved
+            </div>
+          </label>
+          <div style={{ flex: 1 }}>
+            <input id="zoom-client-secret" type="password" style={styles.input}
+              value={zoomClientSecret} onChange={e => setZoomClientSecret(e.target.value)}
+              placeholder={zoomSecretActive ? '••••••••  (active this session)' : 'Enter each session'}
+              autoComplete="new-password" />
+            {zoomSecretActive && !zoomClientSecret && (
+              <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-green)', marginTop: 4 }}>
+                ● Connected this session
+              </div>
+            )}
+          </div>
         </div>
 
         {zoomCredsError && (
@@ -289,7 +292,7 @@ export const SettingsView: React.FC = () => {
         )}
 
         <button style={styles.primaryBtn} onClick={() => void handleSaveZoomCredentials()}>
-          {zoomCredsSaved ? 'Saved ✓' : 'Save Credentials'}
+          {zoomCredsSaved ? 'Saved ✓' : 'Save & Connect'}
         </button>
       </section>
 

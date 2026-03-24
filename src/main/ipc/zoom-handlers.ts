@@ -1,8 +1,8 @@
 import { ipcMain } from 'electron'
 import { randomUUID } from 'crypto'
 import { getDb } from '../db/database'
-import { getAccessToken, clearCache as clearTokenCache } from '../services/ZoomOAuthService'
-import { saveZoomAppCredentials } from '../platform/credentials'
+import { getAccessToken, clearCache as clearTokenCache, setSessionClientSecret, hasSessionClientSecret } from '../services/ZoomOAuthService'
+import { saveZoomAppCredentials, getZoomAppCredentials } from '../platform/credentials'
 import type { ZoomImportRequest, ZoomImportResponse } from '@shared/ipc-types'
 
 interface ZoomRoom {
@@ -144,6 +144,7 @@ export function registerZoomHandlers(): void {
   )
 
   // ── zoom:saveCredentials ──────────────────────────────────────────────────
+  // Persists clientId + accountId; holds clientSecret in memory only.
 
   ipcMain.handle(
     'zoom:saveCredentials',
@@ -152,14 +153,30 @@ export function registerZoomHandlers(): void {
       payload: { clientId: string; clientSecret: string; accountId: string }
     ): Promise<{ success: boolean; error?: string }> => {
       if (!payload?.clientId || !payload?.clientSecret || !payload?.accountId) {
-        return { success: false, error: 'clientId, clientSecret, and accountId are all required' }
+        return { success: false, error: 'All three fields are required' }
       }
       try {
-        await saveZoomAppCredentials(payload.clientId, payload.clientSecret, payload.accountId)
+        await saveZoomAppCredentials(payload.clientId, payload.accountId)
+        setSessionClientSecret(payload.clientSecret)
         clearTokenCache()
         return { success: true }
       } catch (err) {
         return { success: false, error: String(err) }
+      }
+    }
+  )
+
+  // ── zoom:getCredentials ───────────────────────────────────────────────────
+  // Returns saved (non-secret) fields + whether a session secret is active.
+
+  ipcMain.handle(
+    'zoom:getCredentials',
+    async (): Promise<{ clientId: string; accountId: string; secretActive: boolean }> => {
+      const saved = await getZoomAppCredentials()
+      return {
+        clientId: saved?.clientId ?? '',
+        accountId: saved?.accountId ?? '',
+        secretActive: hasSessionClientSecret()
       }
     }
   )

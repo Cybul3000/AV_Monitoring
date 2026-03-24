@@ -2,6 +2,9 @@ import React, { useState } from 'react'
 import { LEDIndicator } from '../components/LEDIndicator'
 import { ConfirmActionDialog } from '../components/ConfirmActionDialog'
 import { ConfigPanel } from '../components/ConfigPanel'
+import { LGDisplayPanel } from '../components/DeviceDetail/LGDisplayPanel/LGDisplayPanel'
+import { LightwarePanel } from '../components/DeviceDetail/LightwarePanel/LightwarePanel'
+import { BiampTesiraPanel } from '../components/DeviceDetail/BiampTesiraPanel/BiampTesiraPanel'
 import { useHierarchy } from '../hooks/useHierarchy'
 import { useDeviceStatus } from '../hooks/useDeviceStatus'
 import type { HierarchyNode } from '@shared/ipc-types'
@@ -21,7 +24,7 @@ interface Props {
 
 export const RoomView: React.FC<Props> = ({ regionId, officeId, floorId, roomId }) => {
   const { roots, update } = useHierarchy()
-  const { getDeviceStatus } = useDeviceStatus()
+  const { getDeviceStatus, getDeviceMeta } = useDeviceStatus()
   const [pendingAction, setPendingAction] = useState<{ deviceId: string; command: string; label: string; params?: Record<string, unknown> } | null>(null)
   const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(null)
   const [showAddDevice, setShowAddDevice] = useState(false)
@@ -175,6 +178,36 @@ export const RoomView: React.FC<Props> = ({ regionId, officeId, floorId, roomId 
                   <div style={{ marginTop: 'var(--spacing-lg)' }}>
                     <ConfigPanel deviceId={selectedDevice.id} />
                   </div>
+                </div>
+              )}
+
+              {selectedDevice.deviceType === 'lg-display' && (
+                <div style={{ marginTop: 'var(--spacing-lg)' }}>
+                  <LGDisplayPanel
+                    device={selectedDevice}
+                    meta={getDeviceMeta(selectedDevice.id)}
+                    onCommand={(command, params) => void handleAction(selectedDevice.id, command, params)}
+                  />
+                </div>
+              )}
+
+              {selectedDevice.deviceType === 'lightware-matrix' && (
+                <div style={{ marginTop: 'var(--spacing-lg)' }}>
+                  <LightwarePanel
+                    device={selectedDevice}
+                    meta={getDeviceMeta(selectedDevice.id)}
+                    onCommand={(command, params) => void handleAction(selectedDevice.id, command, params)}
+                  />
+                </div>
+              )}
+
+              {selectedDevice.deviceType === 'biamp-tesira' && (
+                <div style={{ marginTop: 'var(--spacing-lg)' }}>
+                  <BiampTesiraPanel
+                    device={selectedDevice}
+                    meta={getDeviceMeta(selectedDevice.id)}
+                    onCommand={(command, params) => void handleAction(selectedDevice.id, command, params)}
+                  />
                 </div>
               )}
             </div>
