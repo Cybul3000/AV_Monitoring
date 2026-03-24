@@ -9,8 +9,10 @@ import { RoomView } from './views/RoomView'
 import { ConfigView } from './views/ConfigView'
 import { LogsView } from './views/LogsView'
 import { ObservabilityView } from './views/ObservabilityView'
+import { SettingsView } from './views/SettingsView'
+import { AlertSettingsView } from './views/AlertSettingsView'
 
-type ViewType = 'dashboard' | 'region' | 'office' | 'floor' | 'room' | 'config' | 'logs' | 'observability'
+type ViewType = 'dashboard' | 'region' | 'office' | 'floor' | 'room' | 'config' | 'logs' | 'observability' | 'settings' | 'alert-settings'
 
 interface NavEntry {
   type: ViewType
@@ -31,7 +33,9 @@ const NAV_TABS: Array<{ id: ViewType; label: string }> = [
   { id: 'dashboard', label: 'Dashboard' },
   { id: 'config', label: 'Configuration' },
   { id: 'logs', label: 'Logs' },
-  { id: 'observability', label: 'Observability' }
+  { id: 'observability', label: 'Observability' },
+  { id: 'alert-settings', label: 'Alert Settings' },
+  { id: 'settings', label: 'Settings' }
 ]
 
 export const App: React.FC = () => {
@@ -125,7 +129,7 @@ export const App: React.FC = () => {
   }, [persistPath])
 
   const handleTabClick = (tab: ViewType) => {
-    if (['dashboard', 'config', 'logs', 'observability'].includes(tab)) {
+    if (['dashboard', 'config', 'logs', 'observability', 'alert-settings', 'settings'].includes(tab)) {
       const newStack: NavEntry[] = [{ type: tab }]
       setStack(newStack)
       setActiveTab(tab)
@@ -178,6 +182,10 @@ export const App: React.FC = () => {
         return <LogsView />
       case 'observability':
         return <ObservabilityView />
+      case 'alert-settings':
+        return <AlertSettingsView />
+      case 'settings':
+        return <SettingsView />
       default:
         return <GlobalDashboard onNavigate={navigate} />
     }
@@ -198,7 +206,7 @@ export const App: React.FC = () => {
             key={tab.id}
             style={{
               ...styles.navTab,
-              borderBottom: (activeTab === tab.id || (tab.id === 'dashboard' && isHierarchyView && activeTab !== 'config' && activeTab !== 'logs' && activeTab !== 'observability'))
+              borderBottom: (activeTab === tab.id || (tab.id === 'dashboard' && isHierarchyView && activeTab !== 'config' && activeTab !== 'logs' && activeTab !== 'observability' && activeTab !== 'alert-settings' && activeTab !== 'settings'))
                 ? '2px solid var(--color-accent)'
                 : '2px solid transparent',
               color: (activeTab === tab.id)

@@ -4,10 +4,12 @@
 **Branch**: `001-av-room-monitor`
 **Agents**: A (App Shell), B (Data Layer), C (Zoom Module), G (Hierarchy UI)
 
+> **C1 note (constitution §IV)**: Phases 2–6 were implemented before corresponding test tasks existed (T023 before T031; T033–T036 before T041/T047; T048–T058 have no preceding test stubs). This was a historical TDD ordering deviation. Phases 11–12 below strictly enforce red→green order. Future phases must follow the same pattern: test task (must FAIL) → implementation task.
+
 ## Format: `[ID] [P?] [Story?] Description`
 
 - **[P]**: Parallelisable — different files, no blocking dependencies
-- **[Story]**: User story label (US1–US7); omitted for Setup/Foundational/Polish phases
+- **[Story]**: User story label (US1–US14); omitted for Setup/Foundational/Polish phases
 - Exact file paths included in every description
 
 ---
@@ -48,7 +50,7 @@
 - [X] T016 [P] App menu: File, Edit, View (toggle DevTools), Help (About) — `src/main/menu.ts`
 - [X] T017 [P] System tray: icon + context menu (Show/Hide, Quit) — `src/main/tray.ts`
 - [X] T018 [P] VPN/SSID detection: `os.networkInterfaces()` scan for 10.x.6.0/23 VPN range; platform shell for SSID (macOS: `airport`, Windows: `netsh`) — `src/main/platform/network-check.ts`
-- [X] T019 [P] Keytar credential helpers: `saveCredential(service, account, value)`, `getCredential(service, account)`, `deleteCredential` with namespace `av-monitoring` — `src/main/platform/credentials.ts`
+- [X] T019 [P] Keytar credential helpers: `saveCredential(service, account, value)`, `getCredential(service, account)`, `deleteCredential` with namespace `av-monitoring`; `getCredential` returning `null` MUST be propagated to the module connect lifecycle — the device is set GREY with `credentialsMissing: true` in meta, monitoring suspended, no alert fired (FR-016) — `src/main/platform/credentials.ts`
 - [X] T020 [P] electron-store preferences init: schema with all `pref:` keys from `data-model.md`, default values — `src/main/preferences.ts`
 
 ### Shared IPC Infrastructure
@@ -149,8 +151,8 @@
 
 **Independent Test**: Download Zoom Room config → modify one field externally → restore original → confirm device returns to original state.
 
-- [X] T059 [US5] `ZoomModule` unit tests (write first, must FAIL): `connect` with mock HTTP, `ping` returns `DeviceStatus`, `downloadConfig` returns settings object, `restoreConfig` PUT call, `sendCommand('reboot')` — `tests/unit/zoom/ZoomModule.test.ts`
-- [X] T060 [US5] `ZoomModule` implementation: Zoom REST API calls from `resources/Zoom/zoom-api.md`; OAuth token via keytar; `connect`, `disconnect`, `ping`, `downloadConfig`, `restoreConfig`, `sendCommand` — `src/main/modules/zoom/ZoomModule.ts`
+- [X] T059 [US5] `ZoomModule` unit tests (write first, must FAIL): `connect` with mock TCP probe, `ping` returns `DeviceStatus` (reachability only — no Zoom API), `downloadConfig` returns settings object, `restoreConfig` PUT call, `sendCommand('reboot')` — `tests/unit/zoom/ZoomModule.test.ts`
+- [X] T060 [US5] `ZoomModule` implementation: `ping()` = TCP probe to device host/port (no Zoom API); Zoom REST API (`resources/Zoom/zoom-api.md`) used only for `downloadConfig`, `restoreConfig`, `sendCommand`; OAuth token via keytar — `src/main/modules/zoom/ZoomModule.ts`
 - [X] T061 [P] [US5] `config:export` IPC handler: calls `module.downloadConfig()`, inserts into `device_configs` table (auto-increments `version`), saves JSON to user-chosen path — `src/main/ipc/config-handlers.ts`
 - [X] T062 [P] [US5] `config:import` IPC handler: loads JSON from payload, calls `module.restoreConfig()`, logs outcome; caller must pre-confirm overwrite — `src/main/ipc/config-handlers.ts`
 - [X] T063 [P] [US5] `config:list` IPC handler: queries `device_configs` for device, returns version/date/note list — `src/main/ipc/config-handlers.ts`
@@ -205,6 +207,13 @@
 - [X] T083 [P] Window bounds persistence: save/restore `pref:windowBounds` on `BrowserWindow` `resize`/`move` events — `src/main/index.ts`
 - [X] T084 IPC payload validation: add `zod` or manual type-guard in every `ipcMain.handle` — reject malformed payloads with `{ success: false, error: 'Invalid payload' }` — all `src/main/ipc/*.ts`
 - [X] T085 [P] `db:schema` npm script: dumps current SQLite schema to stdout (`sqlite3 db .schema`) — `package.json` + `scripts/db-schema.ts`
+- [X] T101 `SettingsView`: polling interval input (10–300 s, validated; rejects out-of-range), N-failures-before-RED input (1–10, validated), tooltips-enabled toggle; all fields read/written via `preferences:get/set` IPC; accessible from app menu (View → Settings) — `src/renderer/views/SettingsView.tsx`
+- [X] T104 DB migration 003: add `zoom_location_id TEXT` column to `offices` table; add `zoom_room_id TEXT` column to `devices` table (unique identifier from Zoom API, used for deduplication on re-import) — `src/main/db/migrations/003_zoom_location.sql`
+- [X] T105 [P] App-level Zoom OAuth credential storage: `saveZoomAppCredentials(clientId, clientSecret)`, `getZoomAppCredentials()` stored under keychain entry `av-monitoring/zoom-app`; `ZoomOAuthService` exchanges credentials for access token with auto-refresh — `src/main/services/ZoomOAuthService.ts`
+- [X] T106 [P] `zoom:importRooms` IPC handler: accepts `{ officeId, zoomLocationId }`, calls Zoom API `GET /rooms?location_id=X`, creates device instances for rooms not already present (matched by `zoom_room_id`), skips duplicates, returns `{ created: number, skipped: number, errors: string[] }` — `src/main/ipc/zoom-handlers.ts`
+- [X] T107 [P] "Import Zoom Rooms" UI: in `ConfigView` when an office is selected, show optional Zoom Location ID input (saved to office via `hierarchy:update`) and "Import Zoom Rooms" button; on success show created/skipped summary toast; app-level Zoom OAuth credentials configured via `SettingsView` (T101) — `src/renderer/views/ConfigView.tsx`
+- [X] T102 [P] Settings export/import: `settings:export` IPC handler serialises alert rules (all `alert_rules` rows) + all `pref:` values to JSON/YAML; `settings:import` IPC handler applies file atomically (alert rules upsert + preferences set) after user confirmation warning; file format MUST be identical on macOS and Windows (FR-038, FR-039) — `src/main/ipc/settings-handlers.ts`
+- [X] T103 [P] Settings export/import UI in `SettingsView`: "Export Settings" button (saves file via dialog), "Import Settings" button (opens file dialog, shows overwrite warning, applies via `settings:import`) — `src/renderer/views/SettingsView.tsx`
 
 ---
 
@@ -284,5 +293,48 @@ US1 → US2 → US4 → US3 → US5 → US6 → US7 → Polish
 | US5 — Config | T059–T065 | P5 |
 | US6 — Control | T066–T070 | P6 |
 | US7 — Logs/OTel | T071–T076 | P7 |
-| Polish | T077–T085 | Cross-cutting |
-| **Total** | **85 tasks** | **7 user stories** |
+| Polish | T077–T085, T101–T107 | Cross-cutting |
+| US8 — Alert Rules | T086–T095 | P8 |
+| US14 — Zoom Enhanced | T096–T100 | P14 |
+| **Total** | **107 tasks** | **9 user stories** |
+
+---
+
+## Phase 11: User Story 8 — Configurable Alert Rules (P8)
+
+**Goal**: Per-device-type, per-status-point alert toggles. Non-alertable conditions display as informational only — no LED change. Toggles persist across restarts. New device instances receive sensible defaults.
+
+**Independent Test**: Disable alert toggle for one status point, trigger that condition, confirm LED does not change to AMBER/RED. Re-enable, trigger again, confirm alert fires.
+
+> **TDD ORDER ENFORCED**: T088 (test, must FAIL) → T089 (implementation). T090/T091 (IPC tests, must FAIL) → handlers. T095 (integration test, must FAIL) → T092 wiring.
+
+- [X] T086 [US8] DB migration 002: `alert_rules` table — `device_type TEXT`, `status_point TEXT`, `alert_enabled INTEGER DEFAULT 1`, `PRIMARY KEY (device_type, status_point)` — `src/main/db/migrations/002_alert_rules.sql`
+- [X] T087 [P] [US8] IPC types for alert rules: `AlertRule`, `AlertRulesGetRequest`, `AlertRulesGetResponse`, `AlertRuleSetRequest` — `src/shared/ipc-types.ts`
+- [X] T088 [US8] Unit tests (write first, must FAIL): `AlertRulesService` — `isAlertable('zoom-room', 'reachable')` returns `true` by default; `setRule` persists change; seeded defaults for known device types have alertable conditions ON, informational OFF — `tests/unit/AlertRulesService.test.ts`
+- [X] T089 [US8] `AlertRulesService`: reads/writes `alert_rules` table, `isAlertable(deviceType, statusPoint): boolean`, `seedDefaults(deviceType)` inserts factory defaults if no rows exist for that type — `src/main/services/AlertRulesService.ts`
+- [X] T090 [P] [US8] `alert:getRules` IPC handler: accepts optional `deviceType` filter, returns `AlertRulesGetResponse` — `src/main/ipc/alert-handlers.ts`
+- [X] T091 [P] [US8] `alert:setRule` IPC handler: upserts one rule row, logs change to `events` table — `src/main/ipc/alert-handlers.ts`
+- [X] T092 [US8] Polling integration: in device polling loop, before writing AMBER/RED to `devices.status`, call `AlertRulesService.isAlertable(deviceType, statusPoint)`; if false, write status-data only without changing LED — `src/main/ipc/device-handlers.ts`
+- [X] T093 [P] [US8] `AlertSettingsView`: grouped by device type, each status point row shows label + on/off toggle, persists via `alert:setRule`; add tab/nav entry alongside Dashboard, Logs, Observability — `src/renderer/views/AlertSettingsView.tsx`
+- [X] T094 [US8] New-device default seeding: on device `create` event call `AlertRulesService.seedDefaults(deviceType)` — `src/main/modules/index.ts`
+- [X] T095 [US8] Integration test (write first, must FAIL): seed `alert_rules` with one point disabled → simulate polling event for that point → assert `device:status:all` broadcast LED unchanged; enable rule → repeat → assert LED changes — `tests/integration/alert-rules.test.ts`
+
+**Checkpoint**: Alert rule toggles functional. New devices seeded with defaults. LED unaffected by silenced status points.
+
+---
+
+## Phase 12: User Story 14 — Zoom Room Speaker Test (P14)
+
+**Goal**: "Run Speaker Test" on-demand command via Zoom API, guarded by confirmation dialog and active-meeting check. Reboot already covered by Phase 8 (T070). Zoom polling = network reachability only — no Zoom API calls during the poll cycle.
+
+**Independent Test**: Trigger "Run Speaker Test" on a Zoom Room mock; verify confirmation prompt appears; verify outcome logged. Trigger with active-meeting flag set; verify error surfaced cleanly, nothing logged as a device fault.
+
+> **TDD ORDER ENFORCED**: T096 (tests, must FAIL) → T097 (implementation) → T098 (types, may be parallel) → T099 (UI) → T100 (integration).
+
+- [X] T096 [US14] Unit tests (write first, must FAIL): extend `ZoomModule.test.ts` — `ping()` uses ICMP/TCP probe only (no Zoom API call); `getStatusPoints()` returns exactly `[{ id: 'reachable', label: 'Device Reachable', defaultAlertable: true }]`; `runSpeakerTest()` returns `CommandResult` with `output: 'pass' | 'fail'`; `runSpeakerTest()` while room in active meeting returns `CommandResult{ success: false, error: 'Room in active meeting' }` — `tests/unit/zoom/ZoomModule.test.ts`
+- [X] T097 [US14] `ZoomModule` updates: replace any Zoom API call in `ping()` with a raw TCP probe to the device host/port; implement `getStatusPoints()` returning single `reachable` entry; implement `runSpeakerTest()` via Zoom API with active-meeting guard — `src/main/modules/zoom/ZoomModule.ts`
+- [X] T098 [P] [US14] Add `getStatusPoints(): StatusPointDefinition[]` to `DeviceModule.ts` interface; update `src/shared/ipc-types.ts` `DeviceStatusBroadcast` with a JSDoc note that `meta` is available for module-specific values (no new required fields) — `src/main/modules/_base/DeviceModule.ts` + `src/shared/ipc-types.ts`
+- [X] T099 [US14] `RoomView` speaker test button: add "Run Speaker Test" button to Zoom device detail panel, routed through `ConfirmActionDialog`; on success display outcome inline; on active-meeting error display "Speaker test unavailable — room in active meeting"; all outcomes written to events log — `src/renderer/views/RoomView.tsx`
+- [X] T100 [US14] Integration test (write first, must FAIL): verify `device:status:all` broadcast for Zoom device does NOT contain Zoom API data in `meta`; verify speaker-test command result (pass and active-meeting error) is correctly logged to `events` table — `tests/integration/ipc/device-ipc.test.ts`
+
+**Checkpoint**: Zoom ping = TCP probe only. Speaker test command live with confirmation and active-meeting guard.

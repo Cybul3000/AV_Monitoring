@@ -1,6 +1,7 @@
 import { ipcMain } from 'electron'
 import { randomUUID } from 'crypto'
 import { getDb } from '../db/database'
+import { onDeviceCreated } from '../modules/index'
 import type {
   HierarchyNode,
   HierarchyResponse,
@@ -170,6 +171,8 @@ function handleUpdate(req: HierarchyUpdateRequest): HierarchyUpdateResponse {
           now,
           now
         )
+        // Seed default alert rules for the newly created device type
+        onDeviceCreated(d.deviceType as string)
         return { success: true, id }
       }
     }

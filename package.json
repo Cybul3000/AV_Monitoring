@@ -25,7 +25,8 @@
     "postinstall": "electron-builder install-app-deps"
   },
   "dependencies": {
-    "better-sqlite3": "^9.4.3",
+    "@electron-toolkit/tsconfig": "^2.0.0",
+    "better-sqlite3": "^12.8.0",
     "electron-store": "^9.0.0",
     "keytar": "^7.9.0",
     "react": "^18.3.1",
@@ -43,6 +44,7 @@
     "@typescript-eslint/eslint-plugin": "^7.8.0",
     "@typescript-eslint/parser": "^7.8.0",
     "@vitejs/plugin-react": "^4.2.1",
+    "@vitest/coverage-v8": "^1.5.2",
     "electron": "^30.0.1",
     "electron-builder": "^24.13.3",
     "electron-rebuild": "^3.2.9",
@@ -50,7 +52,6 @@
     "eslint": "^8.57.0",
     "eslint-plugin-react": "^7.34.1",
     "eslint-plugin-react-hooks": "^4.6.2",
-    "@vitest/coverage-v8": "^1.5.2",
     "prettier": "^3.2.5",
     "typescript": "^5.4.5",
     "vite": "^5.2.10",
@@ -77,12 +78,23 @@
     "mac": {
       "category": "public.app-category.utilities",
       "target": [
-        { "target": "dmg", "arch": ["x64", "arm64"] }
+        {
+          "target": "dmg",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        }
       ]
     },
     "win": {
       "target": [
-        { "target": "nsis", "arch": ["x64"] }
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
       ]
     }
   }

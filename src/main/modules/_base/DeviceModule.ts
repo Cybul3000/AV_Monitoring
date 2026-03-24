@@ -4,7 +4,19 @@ export interface DeviceStatus {
   deviceId: string
   status: LEDStatus
   lastSeen: string | null // ISO-8601
-  meta?: Record<string, unknown> // module-specific additional state
+  /** Module-specific status point values, e.g. { micMuted: true, volumeLevel: 75 } */
+  meta?: Record<string, unknown>
+}
+
+/**
+ * Describes a single monitorable status point exposed by a module.
+ * Used by AlertRulesService.seedDefaults() and AlertSettingsView.
+ * getStatusPoints() must be synchronous and pure — no device I/O.
+ */
+export interface StatusPointDefinition {
+  id: string              // stable snake_case key, e.g. 'reachable', 'hdmi_signal'
+  label: string           // human-readable label for AlertSettingsView
+  defaultAlertable: boolean // true = alert ON by default; false = informational only
 }
 
 export interface DeviceConfig {
@@ -38,6 +50,13 @@ export interface DeviceModule {
 
   /** Request an immediate status check (outside poll interval) */
   ping(deviceId: string): Promise<DeviceStatus>
+
+  /**
+   * Return all monitorable status points this module exposes.
+   * Called by AlertRulesService.seedDefaults() and AlertSettingsView.
+   * Must be synchronous — no device I/O.
+   */
+  getStatusPoints(): StatusPointDefinition[]
 
   /** Download current device configuration as a serialisable object */
   downloadConfig(deviceId: string): Promise<Record<string, unknown>>

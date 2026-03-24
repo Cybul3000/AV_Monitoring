@@ -1,6 +1,6 @@
 import { ipcMain, dialog } from 'electron'
 import { randomUUID } from 'crypto'
-import { writeFileSync, readFileSync } from 'fs'
+import { writeFileSync, readFileSync, existsSync } from 'fs'
 import { join } from 'path'
 import { app } from 'electron'
 import { getDb } from '../db/database'
@@ -76,7 +76,7 @@ export function registerConfigHandlers(): void {
   ipcMain.handle(
     'config:import',
     async (_event, req: ConfigImportRequest): Promise<{ success: boolean; error?: string }> => {
-      if (!req?.deviceId || !req?.configJson) return { success: false, error: 'Invalid payload' }
+      if (!req?.deviceId || (!req?.configJson && !req?.filePath)) return { success: false, error: 'Invalid payload' }
 
       const db = getDb()
       const row = db
@@ -90,7 +90,12 @@ export function registerConfigHandlers(): void {
 
       let parsed: Record<string, unknown>
       try {
-        const wrapper = JSON.parse(req.configJson) as { config: Record<string, unknown> }
+        let rawJson = req.configJson
+        if (!rawJson && req.filePath) {
+          if (!existsSync(req.filePath)) return { success: false, error: 'File not found' }
+          rawJson = readFileSync(req.filePath, 'utf-8')
+        }
+        const wrapper = JSON.parse(rawJson!) as { config: Record<string, unknown> }
         parsed = wrapper.config ?? wrapper
       } catch {
         return { success: false, error: 'Invalid config JSON' }
@@ -124,6 +129,7 @@ export function registerConfigHandlers(): void {
         }>
 
       return {
+        success: true,
         configs: rows.map(r => ({
           id: r.id,
           version: r.version,

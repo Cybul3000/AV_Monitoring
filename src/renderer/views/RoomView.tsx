@@ -7,7 +7,7 @@ import { useDeviceStatus } from '../hooks/useDeviceStatus'
 import type { HierarchyNode } from '@shared/ipc-types'
 
 type ApiShape = {
-  deviceCommand: (req: { deviceId: string; command: string; params?: Record<string, unknown> }) => Promise<{ success: boolean; error?: string }>
+  deviceCommand: (req: { deviceId: string; command: string; params?: Record<string, unknown> }) => Promise<{ success: boolean; output?: string; error?: string }>
 }
 
 interface Props {
@@ -22,11 +22,12 @@ interface Props {
 export const RoomView: React.FC<Props> = ({ regionId, officeId, floorId, roomId }) => {
   const { roots, update } = useHierarchy()
   const { getDeviceStatus } = useDeviceStatus()
-  const [pendingAction, setPendingAction] = useState<{ deviceId: string; command: string; label: string } | null>(null)
+  const [pendingAction, setPendingAction] = useState<{ deviceId: string; command: string; label: string; params?: Record<string, unknown> } | null>(null)
   const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(null)
   const [showAddDevice, setShowAddDevice] = useState(false)
   const [deviceForm, setDeviceForm] = useState({ name: '', deviceType: '', host: '', port: '' })
   const [actionResult, setActionResult] = useState<{ message: string; ok: boolean } | null>(null)
+  const [speakerTestResult, setSpeakerTestResult] = useState<{ message: string; ok: boolean } | null>(null)
 
   const room = roots
     .find(r => r.id === regionId)
@@ -39,10 +40,24 @@ export const RoomView: React.FC<Props> = ({ regionId, officeId, floorId, roomId 
   const devices = room.children ?? []
   const selectedDevice = devices.find(d => d.id === selectedDeviceId)
 
-  const handleAction = async (deviceId: string, command: string) => {
-    const res = await (window.api as unknown as ApiShape).deviceCommand({ deviceId, command })
+  const handleAction = async (deviceId: string, command: string, params?: Record<string, unknown>) => {
+    const res = await (window.api as unknown as ApiShape).deviceCommand({ deviceId, command, params })
     setActionResult({ message: res.success ? 'Action completed' : (res.error ?? 'Failed'), ok: res.success })
     setTimeout(() => setActionResult(null), 3000)
+  }
+
+  const handleSpeakerTest = async (deviceId: string, roomId?: string) => {
+    const params = roomId ? { roomId } : undefined
+    const res = await (window.api as unknown as ApiShape).deviceCommand({ deviceId, command: 'speakerTest', params })
+    if (!res.success && res.error === 'Room in active meeting') {
+      setSpeakerTestResult({ message: 'Speaker test unavailable — room is in an active meeting', ok: false })
+    } else if (res.success) {
+      const outcome = res.output === 'fail' ? 'fail \u2717' : 'pass \u2713'
+      setSpeakerTestResult({ message: `Speaker test: ${outcome}`, ok: res.output !== 'fail' })
+    } else {
+      setSpeakerTestResult({ message: `Speaker test failed: ${res.error ?? 'Unknown error'}`, ok: false })
+    }
+    setTimeout(() => setSpeakerTestResult(null), 5000)
   }
 
   const handleAddDevice = async () => {
@@ -135,7 +150,31 @@ export const RoomView: React.FC<Props> = ({ regionId, officeId, floorId, roomId 
 
               {selectedDevice.deviceType === 'zoom-room' && (
                 <div style={{ marginTop: 'var(--spacing-lg)' }}>
-                  <ConfigPanel deviceId={selectedDevice.id} />
+                  <h4 style={{ marginBottom: 'var(--spacing-sm)', color: 'var(--color-text-secondary)' }}>Speaker Test</h4>
+                  <button
+                    style={styles.actionBtn}
+                    onClick={() => setPendingAction({
+                      deviceId: selectedDevice.id,
+                      command: 'speakerTest',
+                      label: 'Run Speaker Test'
+                    })}
+                  >
+                    Run Speaker Test
+                  </button>
+                  {speakerTestResult && (
+                    <div style={{
+                      marginTop: 'var(--spacing-sm)', padding: 'var(--spacing-sm) var(--spacing-md)',
+                      borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-sm)',
+                      background: speakerTestResult.ok ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)',
+                      color: speakerTestResult.ok ? 'var(--color-green)' : 'var(--color-red)',
+                      border: `1px solid ${speakerTestResult.ok ? 'var(--color-green)' : 'var(--color-red)'}`
+                    }}>
+                      {speakerTestResult.message}
+                    </div>
+                  )}
+                  <div style={{ marginTop: 'var(--spacing-lg)' }}>
+                    <ConfigPanel deviceId={selectedDevice.id} />
+                  </div>
                 </div>
               )}
             </div>
@@ -146,11 +185,22 @@ export const RoomView: React.FC<Props> = ({ regionId, officeId, floorId, roomId 
       {pendingAction && (
         <ConfirmActionDialog
           title={`Confirm: ${pendingAction.label}`}
-          message={`Are you sure you want to ${pendingAction.label.toLowerCase()} this device? This action may disrupt ongoing meetings.`}
+          message={
+            pendingAction.command === 'speakerTest'
+              ? 'Run speaker test on this Zoom Room?'
+              : `Are you sure you want to ${pendingAction.label.toLowerCase()} this device? This action may disrupt ongoing meetings.`
+          }
           confirmLabel={pendingAction.label}
-          danger
+          danger={pendingAction.command !== 'speakerTest'}
           onConfirm={() => {
-            void handleAction(pendingAction.deviceId, pendingAction.command)
+            if (pendingAction.command === 'speakerTest') {
+              void handleSpeakerTest(
+                pendingAction.deviceId,
+                pendingAction.params?.roomId as string | undefined
+              )
+            } else {
+              void handleAction(pendingAction.deviceId, pendingAction.command, pendingAction.params)
+            }
             setPendingAction(null)
           }}
           onCancel={() => setPendingAction(null)}

@@ -80,10 +80,12 @@ export interface ConfigExportResponse {
 
 export interface ConfigImportRequest {
   deviceId: string
-  configJson: string
+  configJson?: string
+  filePath?: string
 }
 
 export interface ConfigListResponse {
+  success: boolean
   configs: Array<{
     id: string
     version: number
@@ -209,4 +211,63 @@ export interface OtelGenerateResponse {
   filePath?: string
   yaml?: string
   error?: string
+}
+
+// ── Alert Rule Channels ───────────────────────────────────────────────────────
+
+export interface AlertRule {
+  deviceType: string
+  statusPoint: string
+  alertEnabled: boolean
+}
+
+export interface AlertRulesGetRequest {
+  deviceType?: string
+}
+
+export interface AlertRulesGetResponse {
+  rules: AlertRule[]
+}
+
+export interface AlertRuleSetRequest {
+  deviceType: string
+  statusPoint: string
+  alertEnabled: boolean
+}
+
+// ── Settings Export/Import Channels ──────────────────────────────────────────
+
+export interface SettingsExportRequest {
+  savePath?: string
+}
+
+export interface SettingsExportResponse {
+  success: boolean
+  filePath?: string
+  error?: string
+}
+
+export interface SettingsImportRequest {
+  filePath: string
+}
+
+export interface SettingsImportResponse {
+  success: boolean
+  rulesApplied?: number
+  prefsApplied?: number
+  error?: string
+}
+
+// ── Zoom Import Channels ──────────────────────────────────────────────────────
+
+export interface ZoomImportRequest {
+  officeId: string
+  zoomLocationId: string
+}
+
+export interface ZoomImportResponse {
+  success: boolean
+  created: number
+  skipped: number
+  errors: string[]
 }

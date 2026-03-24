@@ -76,3 +76,32 @@ export async function deleteDeviceCredentials(
     await keytar.deletePassword(service(moduleType), accountKey)
   }
 }
+
+// ── App-level Zoom OAuth credentials ─────────────────────────────────────────
+
+export interface ZoomAppCredentials {
+  clientId: string
+  clientSecret: string
+  accountId: string
+}
+
+export async function saveZoomAppCredentials(
+  clientId: string,
+  clientSecret: string,
+  accountId: string
+): Promise<void> {
+  const value = JSON.stringify({ clientId, clientSecret, accountId })
+  await keytar.setPassword(SERVICE_PREFIX, 'zoom-app-credentials', value)
+}
+
+export async function getZoomAppCredentials(): Promise<ZoomAppCredentials | null> {
+  const raw = await keytar.getPassword(SERVICE_PREFIX, 'zoom-app-credentials')
+  if (!raw) return null
+  try {
+    const parsed = JSON.parse(raw) as ZoomAppCredentials
+    if (parsed.clientId && parsed.clientSecret && parsed.accountId) return parsed
+    return null
+  } catch {
+    return null
+  }
+}

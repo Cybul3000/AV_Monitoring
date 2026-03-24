@@ -9,6 +9,9 @@ import { registerDeviceHandlers, startPolling, stopPolling } from './ipc/device-
 import { registerConfigHandlers } from './ipc/config-handlers'
 import { registerLogHandlers } from './ipc/log-handlers'
 import { registerOtelHandlers } from './ipc/otel-handlers'
+import { registerZoomHandlers } from './ipc/zoom-handlers'
+import { registerSettingsHandlers } from './ipc/settings-handlers'
+import { registerAlertHandlers } from './ipc/alert-handlers'
 import { buildMenu } from './menu'
 import { createTray } from './tray'
 import { getPreference, setPreference } from './preferences'
@@ -69,6 +72,9 @@ function createWindow(): void {
   registerConfigHandlers()
   registerLogHandlers()
   registerOtelHandlers()
+  registerZoomHandlers()
+  registerSettingsHandlers()
+  registerAlertHandlers()
 
   // Start device polling
   startPolling(mainWindow)

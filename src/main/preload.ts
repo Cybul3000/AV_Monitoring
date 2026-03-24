@@ -20,7 +20,16 @@ import type {
   HierarchyUpdateRequest,
   HierarchyUpdateResponse,
   OtelGenerateRequest,
-  OtelGenerateResponse
+  OtelGenerateResponse,
+  SettingsExportRequest,
+  SettingsExportResponse,
+  SettingsImportRequest,
+  SettingsImportResponse,
+  ZoomImportRequest,
+  ZoomImportResponse,
+  AlertRulesGetRequest,
+  AlertRulesGetResponse,
+  AlertRuleSetRequest
 } from '@shared/ipc-types'
 
 const api = {
@@ -105,7 +114,32 @@ const api = {
 
   // ── OTel ─────────────────────────────────────────────────────────────────────
   otelGenerateConfig: (req: OtelGenerateRequest): Promise<OtelGenerateResponse> =>
-    ipcRenderer.invoke('otel:generateConfig', req)
+    ipcRenderer.invoke('otel:generateConfig', req),
+
+  // ── Settings Export/Import ────────────────────────────────────────────────
+  settingsExport: (req: SettingsExportRequest): Promise<SettingsExportResponse> =>
+    ipcRenderer.invoke('settings:export', req),
+
+  settingsImport: (req: SettingsImportRequest): Promise<SettingsImportResponse> =>
+    ipcRenderer.invoke('settings:import', req),
+
+  // ── Zoom ──────────────────────────────────────────────────────────────────
+  zoomImportRooms: (req: ZoomImportRequest): Promise<ZoomImportResponse> =>
+    ipcRenderer.invoke('zoom:importRooms', req),
+
+  zoomSaveCredentials: (payload: {
+    clientId: string
+    clientSecret: string
+    accountId: string
+  }): Promise<{ success: boolean; error?: string }> =>
+    ipcRenderer.invoke('zoom:saveCredentials', payload),
+
+  // ── Alert Rules ───────────────────────────────────────────────────────────
+  alertGetRules: (req?: AlertRulesGetRequest): Promise<AlertRulesGetResponse> =>
+    ipcRenderer.invoke('alert:getRules', req ?? {}),
+
+  alertSetRule: (req: AlertRuleSetRequest): Promise<{ success: boolean; error?: string }> =>
+    ipcRenderer.invoke('alert:setRule', req)
 }
 
 contextBridge.exposeInMainWorld('api', api)

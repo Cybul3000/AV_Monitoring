@@ -1,6 +1,7 @@
-import React, { useState } from 'react'
+import React, { useState, useRef } from 'react'
 import { useHierarchy } from '../hooks/useHierarchy'
 import { AddDeviceForm } from '../components/AddDeviceForm'
+import type { ZoomImportRequest, ZoomImportResponse } from '@shared/ipc-types'
 
 interface Props {
   onNavigate: (type: string, id: string, name: string) => void
@@ -13,9 +14,70 @@ interface DeviceTypeEntry {
   moduleAvailable: boolean
 }
 
+type ApiShape = {
+  zoomImportRooms: (req: ZoomImportRequest) => Promise<ZoomImportResponse>
+  hierarchyUpdate: (req: import('@shared/ipc-types').HierarchyUpdateRequest) => Promise<import('@shared/ipc-types').HierarchyUpdateResponse>
+}
+
 export const ConfigView: React.FC<Props> = ({ onNavigate }) => {
   const { roots, update } = useHierarchy()
   const [addingToRoom, setAddingToRoom] = useState<{ roomId: string; roomName: string } | null>(null)
+  const [selectedOfficeId, setSelectedOfficeId] = useState<string | null>(null)
+  const [zoomLocationId, setZoomLocationId] = useState('')
+  const [importResult, setImportResult] = useState<ZoomImportResponse | null>(null)
+  const [importing, setImporting] = useState(false)
+  const zoomDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // Flatten all offices from hierarchy
+  const allOffices: Array<{ id: string; name: string; region: string; zoomLocationId?: string }> = []
+  roots.forEach(region => {
+    region.children?.forEach(office => {
+      allOffices.push({
+        id: office.id,
+        name: office.name,
+        region: region.name
+      })
+    })
+  })
+
+  const selectedOffice = selectedOfficeId ? allOffices.find(o => o.id === selectedOfficeId) ?? null : null
+
+  const handleOfficeSelect = (officeId: string) => {
+    setSelectedOfficeId(officeId)
+    setZoomLocationId('')
+    setImportResult(null)
+  }
+
+  const handleZoomLocationIdChange = (value: string) => {
+    setZoomLocationId(value)
+    if (zoomDebounceRef.current) clearTimeout(zoomDebounceRef.current)
+    if (!selectedOfficeId) return
+    zoomDebounceRef.current = setTimeout(() => {
+      void update({
+        action: 'update',
+        type: 'office',
+        id: selectedOfficeId,
+        data: { zoomLocationId: value }
+      })
+    }, 600)
+  }
+
+  const handleImportZoomRooms = async () => {
+    if (!selectedOfficeId || !zoomLocationId.trim()) return
+    setImporting(true)
+    setImportResult(null)
+    try {
+      const res = await (window.api as unknown as ApiShape).zoomImportRooms({
+        officeId: selectedOfficeId,
+        zoomLocationId: zoomLocationId.trim()
+      })
+      setImportResult(res)
+    } catch (err) {
+      setImportResult({ success: false, created: 0, skipped: 0, errors: [String(err)] })
+    } finally {
+      setImporting(false)
+    }
+  }
 
   const deviceTypes: DeviceTypeEntry[] = [
     { type: 'zoom-room', label: 'Zoom Room', description: 'Zoom Rooms hardware via Zoom REST API', moduleAvailable: true },
@@ -89,6 +151,83 @@ export const ConfigView: React.FC<Props> = ({ onNavigate }) => {
       </section>
 
       <section style={styles.section}>
+        <h3 style={styles.sectionTitle}>Import Zoom Rooms</h3>
+        <p style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', marginBottom: 'var(--spacing-sm)' }}>
+          Configure Zoom API credentials in Settings before importing.
+        </p>
+
+        {allOffices.length === 0 ? (
+          <p style={{ color: 'var(--color-text-muted)', fontSize: 'var(--font-size-sm)' }}>
+            No offices configured. Add a region and office in the hierarchy first.
+          </p>
+        ) : (
+          <>
+            <div style={{ marginBottom: 'var(--spacing-sm)' }}>
+              <label style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', display: 'block', marginBottom: 4 }}>
+                Select Office
+              </label>
+              <select
+                style={styles.select}
+                value={selectedOfficeId ?? ''}
+                onChange={e => handleOfficeSelect(e.target.value)}
+              >
+                <option value="">— choose an office —</option>
+                {allOffices.map(o => (
+                  <option key={o.id} value={o.id}>{o.region} › {o.name}</option>
+                ))}
+              </select>
+            </div>
+
+            {selectedOffice && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-sm)' }}>
+                <div>
+                  <label style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', display: 'block', marginBottom: 4 }}>
+                    Zoom Location ID
+                  </label>
+                  <input
+                    style={styles.textInput}
+                    type="text"
+                    placeholder="e.g. abc123XYZ"
+                    value={zoomLocationId}
+                    onChange={e => handleZoomLocationIdChange(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <button
+                    style={{
+                      ...styles.addBtn,
+                      opacity: (!zoomLocationId.trim() || importing) ? 0.5 : 1,
+                      cursor: (!zoomLocationId.trim() || importing) ? 'not-allowed' : 'pointer'
+                    }}
+                    disabled={!zoomLocationId.trim() || importing}
+                    onClick={() => void handleImportZoomRooms()}
+                  >
+                    {importing ? 'Importing…' : 'Import Zoom Rooms'}
+                  </button>
+                </div>
+
+                {importResult && (
+                  <div style={{
+                    padding: 'var(--spacing-xs) var(--spacing-sm)',
+                    borderRadius: 'var(--radius-sm)',
+                    fontSize: 'var(--font-size-xs)',
+                    background: importResult.success ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)',
+                    color: importResult.success ? 'var(--color-green)' : 'var(--color-red)',
+                    border: `1px solid ${importResult.success ? 'var(--color-green)' : 'var(--color-red)'}`
+                  }}>
+                    {importResult.success
+                      ? `Created: ${importResult.created} | Skipped: ${importResult.skipped}`
+                      : importResult.errors.join('; ')
+                    }
+                  </div>
+                )}
+              </div>
+            )}
+          </>
+        )}
+      </section>
+
+      <section style={styles.section}>
         <h3 style={styles.sectionTitle}>Add Device to Room</h3>
         {allRooms.length === 0 ? (
           <p style={{ color: 'var(--color-text-muted)', fontSize: 'var(--font-size-sm)' }}>
@@ -145,6 +284,18 @@ const styles = {
   title: { fontSize: 'var(--font-size-xl)', fontWeight: 700, margin: 0 },
   section: { marginBottom: 'var(--spacing-xl)' },
   sectionTitle: { fontSize: 'var(--font-size-md)', fontWeight: 600, marginBottom: 'var(--spacing-md)', color: 'var(--color-text-secondary)' },
+  select: {
+    padding: '8px 12px', background: 'var(--color-bg-surface)',
+    border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)',
+    color: 'var(--color-text-primary)', fontSize: 'var(--font-size-sm)',
+    outline: 'none', minWidth: 260
+  },
+  textInput: {
+    padding: '8px 12px', background: 'var(--color-bg-surface)',
+    border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)',
+    color: 'var(--color-text-primary)', fontSize: 'var(--font-size-sm)',
+    outline: 'none', width: 260
+  },
   typeGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 'var(--spacing-sm)' },
   typeCard: {
     padding: 'var(--spacing-md)', background: 'var(--color-bg-surface)',

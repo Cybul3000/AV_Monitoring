@@ -3,6 +3,7 @@ import { randomUUID } from 'crypto'
 import { getDb } from '../db/database'
 import { getModule } from '../modules/index'
 import { computeFullHierarchyLEDs } from '../services/StatusAggregator'
+import { alertRulesService } from '../services/AlertRulesService'
 import { getPreference } from '../preferences'
 import { shell } from 'electron'
 import type {
@@ -115,6 +116,14 @@ async function pollDevice(deviceId: string): Promise<void> {
       const threshold = getPreference('pref:consecutiveFailuresBeforeRed') as number ?? 3
       newStatus = failRow.cnt >= threshold ? 'RED' : 'AMBER'
     }
+  }
+
+  // Alert gate: if the new status is AMBER or RED, check whether this
+  // device type's 'reachable' status point has alerting enabled.
+  // If not alertable, retain the current (pre-poll) status.
+  if ((newStatus === 'AMBER' || newStatus === 'RED') &&
+      !alertRulesService.isAlertable(row.device_type, 'reachable')) {
+    newStatus = row.status
   }
 
   const now = new Date().toISOString()

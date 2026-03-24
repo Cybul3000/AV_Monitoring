@@ -2,6 +2,7 @@ import { join } from 'path'
 import { app } from 'electron'
 import { readFileSync, existsSync } from 'fs'
 import type { DeviceModule } from './_base/DeviceModule'
+import { alertRulesService } from '../services/AlertRulesService'
 
 // Lazily-loaded module instances keyed by device type
 const _modules = new Map<string, DeviceModule>()
@@ -80,6 +81,18 @@ export function getModule(type: string): DeviceModule | null {
 
 export function isModuleAvailable(type: string): boolean {
   return _factories.has(type)
+}
+
+/**
+ * Called after a new device is successfully created in the hierarchy.
+ * Seeds default alert rules for the given device type.
+ */
+export function onDeviceCreated(deviceType: string): void {
+  try {
+    alertRulesService.seedDefaults(deviceType)
+  } catch {
+    // Non-fatal: alert rules are a best-effort seeding
+  }
 }
 
 /** Register all implemented modules. Add new modules here as they are developed. */

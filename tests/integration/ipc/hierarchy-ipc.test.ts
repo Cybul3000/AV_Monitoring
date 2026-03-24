@@ -60,10 +60,9 @@ describe('hierarchy IPC handlers', () => {
   })
 
   it('hierarchy:get returns empty roots array initially', async () => {
-    const result = await invokeHandler('hierarchy:get', {}) as { success: boolean; nodes: unknown[] }
-    expect(result.success).toBe(true)
-    expect(Array.isArray(result.nodes)).toBe(true)
-    expect(result.nodes).toHaveLength(0)
+    const result = await invokeHandler('hierarchy:get', {}) as { roots: unknown[] }
+    expect(Array.isArray(result.roots)).toBe(true)
+    expect(result.roots).toHaveLength(0)
   })
 
   it('hierarchy:update creates a region', async () => {
@@ -76,9 +75,9 @@ describe('hierarchy IPC handlers', () => {
     expect(createResult.success).toBe(true)
     expect(createResult.id).toBeTruthy()
 
-    const getResult = await invokeHandler('hierarchy:get', {}) as { success: boolean; nodes: Array<{ name: string }> }
-    expect(getResult.nodes).toHaveLength(1)
-    expect(getResult.nodes[0].name).toBe('EMEA')
+    const getResult = await invokeHandler('hierarchy:get', {}) as { roots: Array<{ name: string }> }
+    expect(getResult.roots).toHaveLength(1)
+    expect(getResult.roots[0].name).toBe('EMEA')
   })
 
   it('hierarchy:update create + get verifies node present', async () => {
@@ -86,8 +85,8 @@ describe('hierarchy IPC handlers', () => {
       action: 'create', type: 'region', data: { name: 'APAC' }
     })
 
-    const result = await invokeHandler('hierarchy:get', {}) as { success: boolean; nodes: Array<{ name: string }> }
-    const names = result.nodes.map((n: { name: string }) => n.name)
+    const result = await invokeHandler('hierarchy:get', {}) as { roots: Array<{ name: string }> }
+    const names = result.roots.map((n: { name: string }) => n.name)
     expect(names).toContain('APAC')
   })
 

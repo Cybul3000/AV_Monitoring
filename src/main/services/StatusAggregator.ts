@@ -13,7 +13,7 @@ export function aggregateStatus(statuses: LEDStatus[]): LEDStatus {
   if (statuses.length === 0) return 'GREY'
   if (statuses.includes('RED')) return 'RED'
   if (statuses.includes('AMBER')) return 'AMBER'
-  if (statuses.every(s => s === 'GREEN')) return 'GREEN'
+  if (statuses.some(s => s === 'GREEN')) return 'GREEN'
   return 'GREY'
 }
 
