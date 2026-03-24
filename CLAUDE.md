@@ -28,6 +28,7 @@ tests/
 : Follow standard conventions
 
 ## Recent Changes
+- 003-dante-network-audio: Completed US2–US5 — subscription management (ARC 0x3010/0x3014), settings validation (6 sample rates, 3 encodings), device/channel rename (ARC 0x1001), AVIO gain (Settings port 8700), DanteNotificationListener (multicast 224.0.0.231:8702), all IPC handlers (dante:subscribe, dante:unsubscribe, dante:settings:set, dante:rename:device, dante:rename:channel, dante:gain:set), renderer components (DanteSubscriptionTable, DanteSettingsForm); all 273 tests passing
 - 003-dante-network-audio: Added TypeScript 5.x (Electron 30 main process, Node.js 20 LTS) + `multicast-dns` (new, npm) + `dgram` / `Buffer` / `os` (built-in Node.js)
 - 006-biamp-tesira-dsp: Added TTP over SSH/Telnet, Node.js `net` (Telnet fallback), quasi-JSON parser, biamp_block_configs + biamp_preset_configs tables
 - 005-lightware-matrix-switcher: Added LW3 raw TCP transport, Node.js `net.Socket`, device-family detection (MX2 vs MMX/MODEX)

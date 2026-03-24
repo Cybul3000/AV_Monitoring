@@ -50,7 +50,8 @@ function applyMigrations(db: Database.Database): void {
     { version: 1, file: '001_initial.sql' },
     { version: 2, file: '002_alert_rules.sql' },
     { version: 3, file: '003_zoom_location.sql' },
-    { version: 4, file: '004_biamp_configs.sql' }
+    { version: 4, file: '004_biamp_configs.sql' },
+    { version: 5, file: '005_dante.sql' }
   ]
 
   for (const migration of migrationFiles) {
