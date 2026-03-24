@@ -1,7 +1,7 @@
 import { ipcMain, BrowserWindow } from 'electron'
 import { randomUUID } from 'crypto'
 import { getDb } from '../db/database'
-import { getModule } from '../modules/index'
+import { getModule, getRegistryEntries, isModuleAvailable } from '../modules/index'
 import { computeFullHierarchyLEDs } from '../services/StatusAggregator'
 import { alertRulesService } from '../services/AlertRulesService'
 import { getPreference } from '../preferences'
@@ -36,6 +36,20 @@ export function registerDeviceHandlers(win: BrowserWindow): void {
   ipcMain.handle('device:ping', async (_event, payload: { deviceId: string }) => {
     if (!payload?.deviceId) return { success: false, error: 'Invalid payload' }
     return pingDevice(payload.deviceId)
+  })
+
+  ipcMain.handle('registry:list', () => {
+    try {
+      const entries = getRegistryEntries().map(e => ({
+        type: e.type,
+        label: e.label,
+        configFields: e.configFields,
+        moduleAvailable: isModuleAvailable(e.type)
+      }))
+      return { success: true, entries }
+    } catch (err) {
+      return { success: false, error: String(err) }
+    }
   })
 }
 

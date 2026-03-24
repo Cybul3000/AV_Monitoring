@@ -81,10 +81,10 @@ export const ConfigView: React.FC<Props> = ({ onNavigate }) => {
 
   const deviceTypes: DeviceTypeEntry[] = [
     { type: 'zoom-room', label: 'Zoom Room', description: 'Zoom Rooms hardware via Zoom REST API', moduleAvailable: true },
+    { type: 'lg-display', label: 'LG Pro Display', description: 'LG commercial displays via TCP', moduleAvailable: true },
+    { type: 'lightware-matrix', label: 'Lightware Matrix', description: 'Lightware video matrix via LW3', moduleAvailable: true },
+    { type: 'biamp-tesira', label: 'Biamp Tesira', description: 'Biamp Tesira DSP via TTP/SSH', moduleAvailable: true },
     { type: 'crestron-ssh', label: 'Crestron SSH', description: 'Crestron processors via SSH', moduleAvailable: false },
-    { type: 'biamp-tesira', label: 'Biamp Tesira', description: 'Biamp Tesira DSP via TTP/SSH', moduleAvailable: false },
-    { type: 'lightware-matrix', label: 'Lightware Matrix', description: 'Lightware video matrix via LW3', moduleAvailable: false },
-    { type: 'lg-display', label: 'LG Pro Display', description: 'LG commercial displays', moduleAvailable: false },
     { type: 'dante-audio', label: 'Dante Audio', description: 'Dante network audio devices', moduleAvailable: false }
   ]
 

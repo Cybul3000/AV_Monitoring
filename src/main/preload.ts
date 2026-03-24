@@ -144,6 +144,10 @@ const api = {
   alertSetRule: (req: AlertRuleSetRequest): Promise<{ success: boolean; error?: string }> =>
     ipcRenderer.invoke('alert:setRule', req),
 
+  // ── Registry ──────────────────────────────────────────────────────────────
+  registryList: (): Promise<{ success: boolean; entries?: Array<{ type: string; label: string; configFields: unknown[]; moduleAvailable: boolean }>; error?: string }> =>
+    ipcRenderer.invoke('registry:list'),
+
   // ── Dialogs ───────────────────────────────────────────────────────────────
   selectFile: (options?: { filters?: Array<{ name: string; extensions: string[] }> }): Promise<string | null> =>
     ipcRenderer.invoke('dialog:selectFile', options)

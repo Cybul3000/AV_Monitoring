@@ -56,11 +56,11 @@ export const AddDeviceForm: React.FC<Props> = ({ onAdd, onCancel }) => {
         // fallback: hard-coded types list
         const fallback: DeviceTypeEntry[] = [
           { type: 'zoom-room', label: 'Zoom Room', configFields: [], moduleAvailable: true },
-          { type: 'lg-display', label: 'LG Display', configFields: [], moduleAvailable: false },
-          { type: 'dante-audio', label: 'Dante Audio', configFields: [], moduleAvailable: false },
+          { type: 'lg-display', label: 'LG Pro Display', configFields: [], moduleAvailable: true },
+          { type: 'lightware-matrix', label: 'Lightware Matrix', configFields: [], moduleAvailable: true },
+          { type: 'biamp-tesira', label: 'Biamp Tesira', configFields: [], moduleAvailable: true },
           { type: 'crestron-ssh', label: 'Crestron SSH', configFields: [], moduleAvailable: false },
-          { type: 'lightware-matrix', label: 'Lightware Matrix', configFields: [], moduleAvailable: false },
-          { type: 'biamp-tesira', label: 'Biamp Tesira', configFields: [], moduleAvailable: false }
+          { type: 'dante-audio', label: 'Dante Audio', configFields: [], moduleAvailable: false }
         ]
         setDeviceTypes(fallback)
         setSelectedType('zoom-room')
