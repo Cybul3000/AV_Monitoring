@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { LEDIndicator } from '../components/LEDIndicator'
 import { ConfirmActionDialog } from '../components/ConfirmActionDialog'
 import { ConfigPanel } from '../components/ConfigPanel'
+import { AddDeviceForm } from '../components/AddDeviceForm'
 import { LGDisplayPanel } from '../components/DeviceDetail/LGDisplayPanel/LGDisplayPanel'
 import { LightwarePanel } from '../components/DeviceDetail/LightwarePanel/LightwarePanel'
 import { BiampTesiraPanel } from '../components/DeviceDetail/BiampTesiraPanel/BiampTesiraPanel'
@@ -29,7 +30,6 @@ export const RoomView: React.FC<Props> = ({ regionId, officeId, floorId, roomId 
   const [pendingAction, setPendingAction] = useState<{ deviceId: string; command: string; label: string; params?: Record<string, unknown> } | null>(null)
   const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(null)
   const [showAddDevice, setShowAddDevice] = useState(false)
-  const [deviceForm, setDeviceForm] = useState({ name: '', deviceType: '', host: '', port: '' })
   const [actionResult, setActionResult] = useState<{ message: string; ok: boolean } | null>(null)
   const [speakerTestResult, setSpeakerTestResult] = useState<{ message: string; ok: boolean } | null>(null)
 
@@ -64,16 +64,11 @@ export const RoomView: React.FC<Props> = ({ regionId, officeId, floorId, roomId 
     setTimeout(() => setSpeakerTestResult(null), 5000)
   }
 
-  const handleAddDevice = async () => {
-    if (!deviceForm.name || !deviceForm.deviceType || !deviceForm.host) return
+  const handleAddDevice = async (data: { name: string; deviceType: string; host: string; port?: number; credentials?: Record<string, string>; config?: Record<string, unknown> }) => {
     await update({
       action: 'create', type: 'device', parentId: roomId,
-      data: {
-        name: deviceForm.name, deviceType: deviceForm.deviceType,
-        host: deviceForm.host, port: deviceForm.port ? parseInt(deviceForm.port, 10) : undefined
-      }
+      data: { name: data.name, deviceType: data.deviceType, host: data.host, port: data.port }
     })
-    setDeviceForm({ name: '', deviceType: '', host: '', port: '' })
     setShowAddDevice(false)
   }
 
@@ -250,20 +245,11 @@ export const RoomView: React.FC<Props> = ({ regionId, officeId, floorId, roomId 
       {showAddDevice && (
         <div style={styles.overlay} onClick={() => setShowAddDevice(false)}>
           <div style={styles.modal} onClick={e => e.stopPropagation()}>
-            <h3 style={{ marginBottom: 'var(--spacing-md)' }}>Add Device</h3>
-            <input autoFocus style={styles.input} placeholder="Device name" value={deviceForm.name}
-              onChange={e => setDeviceForm(f => ({ ...f, name: e.target.value }))} />
-            <input style={styles.input} placeholder="Device type (e.g., zoom-room)" value={deviceForm.deviceType}
-              onChange={e => setDeviceForm(f => ({ ...f, deviceType: e.target.value }))} />
-            <input style={styles.input} placeholder="Host / IP address" value={deviceForm.host}
-              onChange={e => setDeviceForm(f => ({ ...f, host: e.target.value }))} />
-            <input style={styles.input} placeholder="Port (optional)" type="number" value={deviceForm.port}
-              onChange={e => setDeviceForm(f => ({ ...f, port: e.target.value }))}
-              onKeyDown={e => { if (e.key === 'Enter') void handleAddDevice() }} />
-            <div style={{ display: 'flex', gap: 'var(--spacing-sm)', justifyContent: 'flex-end' }}>
-              <button style={styles.cancelBtn} onClick={() => setShowAddDevice(false)}>Cancel</button>
-              <button style={styles.confirmBtn} onClick={() => void handleAddDevice()}>Add</button>
-            </div>
+            <AddDeviceForm
+              roomId={roomId}
+              onAdd={handleAddDevice}
+              onCancel={() => setShowAddDevice(false)}
+            />
           </div>
         </div>
       )}
