@@ -2,23 +2,24 @@ import { test, expect, _electron as electron } from '@playwright/test'
 import path from 'path'
 import os from 'os'
 import fs from 'fs'
-import Database from 'better-sqlite3'
+import { execSync } from 'child_process'
 
 const MIGRATION_PATH = path.resolve(__dirname, '../../src/main/db/migrations/001_initial.sql')
-const APP_ENTRY = path.resolve(__dirname, '../../dist/main/index.js')
+const APP_ENTRY = path.resolve(__dirname, '../../dist-electron/main/index.js')
 
 function seedTestDb(dbPath: string) {
-  const db = new Database(dbPath)
-  db.pragma('journal_mode = WAL')
-  db.pragma('foreign_keys = ON')
-  db.exec(fs.readFileSync(MIGRATION_PATH, 'utf-8'))
-
-  db.prepare("INSERT INTO regions (id, name) VALUES ('r1', 'EMEA')").run()
-  db.prepare("INSERT INTO offices (id, region_id, name, city) VALUES ('o1', 'r1', 'London HQ', 'London')").run()
-  db.prepare("INSERT INTO floors (id, office_id, name, level) VALUES ('f1', 'o1', 'Ground Floor', 1)").run()
-  db.prepare("INSERT INTO rooms (id, floor_id, name) VALUES ('rm1', 'f1', 'Boardroom')").run()
-  db.prepare("INSERT INTO devices (id, room_id, name, device_type, host, status) VALUES ('d1', 'rm1', 'Zoom Boardroom', 'zoom-room', '10.0.0.1', 'RED')").run()
-  db.close()
+  const migrationSql = fs.readFileSync(MIGRATION_PATH, 'utf-8')
+  const seedSql = `
+INSERT INTO regions (id, name) VALUES ('r1', 'EMEA');
+INSERT INTO offices (id, region_id, name, city) VALUES ('o1', 'r1', 'London HQ', 'London');
+INSERT INTO floors (id, office_id, name, level) VALUES ('f1', 'o1', 'Ground Floor', 1);
+INSERT INTO rooms (id, floor_id, name) VALUES ('rm1', 'f1', 'Boardroom');
+INSERT INTO devices (id, room_id, name, device_type, host, status) VALUES ('d1', 'rm1', 'Zoom Boardroom', 'zoom-room', '10.0.0.1', 'RED');
+`
+  const sqlFile = dbPath + '.seed.sql'
+  fs.writeFileSync(sqlFile, migrationSql + '\n' + seedSql)
+  execSync(`sqlite3 "${dbPath}" < "${sqlFile}"`)
+  fs.unlinkSync(sqlFile)
 }
 
 test.describe('Hierarchy drill-down navigation', () => {
@@ -44,7 +45,7 @@ test.describe('Hierarchy drill-down navigation', () => {
 
     const app = await electron.launch({
       args: [APP_ENTRY],
-      env: { ...process.env, AV_MON_DB_PATH: dbPath }
+      env: { ...process.env, AV_MON_DB_PATH: dbDir }
     })
 
     try {
@@ -66,7 +67,7 @@ test.describe('Hierarchy drill-down navigation', () => {
 
     const app = await electron.launch({
       args: [APP_ENTRY],
-      env: { ...process.env, AV_MON_DB_PATH: dbPath }
+      env: { ...process.env, AV_MON_DB_PATH: dbDir }
     })
 
     try {
@@ -105,7 +106,7 @@ test.describe('Hierarchy drill-down navigation', () => {
 
     const app = await electron.launch({
       args: [APP_ENTRY],
-      env: { ...process.env, AV_MON_DB_PATH: dbPath }
+      env: { ...process.env, AV_MON_DB_PATH: dbDir }
     })
 
     try {

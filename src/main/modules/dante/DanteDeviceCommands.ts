@@ -19,6 +19,7 @@ export {
   parseChannelCount,
   parseSettings,
   parseSubscriptionStatus,
+  parseArcResponse,
 } from './DantePacket'
 
 // TX pages: 32 channels per page; RX pages: 16 channels per page
