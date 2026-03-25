@@ -11,7 +11,7 @@ const NOTIFICATION_PORT = 8702
 export class DanteNotificationListener extends EventEmitter {
   private _socket: ReturnType<typeof dgram.createSocket> | null = null
 
-  start(): void {
+  start(networkInterfaceIp?: string): void {
     if (this._socket) return
 
     const socket = dgram.createSocket({ type: 'udp4', reuseAddr: true })
@@ -26,6 +26,13 @@ export class DanteNotificationListener extends EventEmitter {
     })
 
     socket.bind(NOTIFICATION_PORT, '0.0.0.0', () => {
+      if (networkInterfaceIp) {
+        try {
+          socket.addMembership(NOTIFICATION_MULTICAST_GROUP, networkInterfaceIp)
+        } catch { /* ignore */ }
+        return
+      }
+
       // Join multicast group on every non-internal IPv4 interface (cross-platform: Windows + macOS)
       const ifaces = os.networkInterfaces()
       let joined = false

@@ -51,9 +51,11 @@
     {
       "type": "dante-network-audio",
       "label": "Dante Network Audio",
+      "module": "DanteModule",
+      "protocol": "mDNS/UDP",
+      "port": null,
       "configFields": [
-        { "key": "host", "label": "IP Address", "type": "text", "required": true },
-        { "key": "arcPort", "label": "ARC Port", "type": "number", "required": false, "default": 4440, "hint": "Default 4440 — overridden by mDNS if discovered automatically" }
+        { "key": "host", "label": "Network Interface", "secret": false, "hint": "Interface name for Dante mDNS discovery (e.g. en0, eth0, Ethernet). Leave blank to discover on all interfaces." }
       ]
     },
     {

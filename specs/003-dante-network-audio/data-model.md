@@ -116,6 +116,8 @@ interface DanteSubscription {
 
 ## Key Entities
 
+> **Correction (spec 007)**: The description below originally stated "One physical Dante device maps to one app `devices` record". This is incorrect. The correct model is the singleton-gateway pattern: one `devices` row = the Dante Network gateway for the room; all discovered Dante endpoints are stored only in `dante_devices`. See `specs/007-dante-network-monitor/data-model.md` for the authoritative corrected model.
+
 ### DanteDevice
 A networked audio endpoint discovered via mDNS. One physical Dante device maps to one app `devices` record (type `dante-network-audio`) and one `dante_devices` record.
 

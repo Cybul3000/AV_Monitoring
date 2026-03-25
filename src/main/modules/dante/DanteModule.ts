@@ -3,6 +3,7 @@
 
 import { randomUUID } from 'crypto'
 import { EventEmitter } from 'events'
+import os from 'os'
 import type {
   DeviceModule,
   DeviceConfig,
@@ -97,6 +98,17 @@ export function computeLedStatus(state: Pick<DanteDeviceState, 'ledStatus' | 'rx
   return 'GREEN'
 }
 
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+/** Resolve a network interface name (e.g. "en0") to its IPv4 address, or undefined if not found. */
+function resolveInterfaceIp(interfaceName: string | undefined): string | undefined {
+  if (!interfaceName) return undefined
+  const ifaces = os.networkInterfaces()
+  const addrs = ifaces[interfaceName]
+  if (!addrs) return undefined
+  return addrs.find(a => a.family === 'IPv4' && !a.internal)?.address
+}
+
 // ── DanteModule ───────────────────────────────────────────────────────────────
 
 export class DanteModule extends EventEmitter implements DeviceModule {
@@ -108,6 +120,8 @@ export class DanteModule extends EventEmitter implements DeviceModule {
   private _devices = new Map<string, DanteDeviceState>()
   // keyed by MAC address → device name (for heartbeat lookup)
   private _macToName = new Map<string, string>()
+  // anchor deviceId from connect() — all discovered devices share this FK
+  private _anchorDeviceId: string | null = null
 
   private _discovery: DanteMdnsDiscovery | null = null
   private _heartbeat: DanteHeartbeatListener | null = null
@@ -127,10 +141,13 @@ export class DanteModule extends EventEmitter implements DeviceModule {
 
   // ── DeviceModule: lifecycle ───────────────────────────────────────────────
 
-  async connect(_deviceId: string, _config: DeviceConfig): Promise<void> {
+  async connect(deviceId: string, config: DeviceConfig): Promise<void> {
     // For Dante, connect starts the global discovery/heartbeat listeners.
-    // Individual device configs are not relevant — discovery is network-wide.
+    // config.host holds the network interface name (e.g. "en0") — optional.
     if (this._transport) return  // already started
+
+    this._anchorDeviceId = deviceId
+    const interfaceIp = resolveInterfaceIp(config.host)
 
     this._transport = new DanteUdpTransport()
     this._discovery = new DanteMdnsDiscovery()
@@ -157,9 +174,9 @@ export class DanteModule extends EventEmitter implements DeviceModule {
       this._onRoutingChange(macAddress)
     })
 
-    this._discovery.start()
-    this._heartbeat.start()
-    this._notification.start()
+    this._discovery.start(interfaceIp)
+    this._heartbeat.start(interfaceIp)
+    this._notification.start(interfaceIp)
   }
 
   async disconnect(_deviceId: string): Promise<void> {
@@ -176,32 +193,33 @@ export class DanteModule extends EventEmitter implements DeviceModule {
   }
 
   async ping(_deviceId: string): Promise<DeviceStatus> {
-    // For Dante, ping means checking the in-memory state of any known device.
-    // We use the first known device as representative, or return GREY if none.
-    const now = new Date().toISOString()
+    const anchorId = this._anchorDeviceId ?? _deviceId
 
     if (this._devices.size === 0) {
-      return { deviceId: _deviceId, status: 'GREY', lastSeen: null }
+      return { deviceId: anchorId, status: 'GREY', lastSeen: null }
     }
 
-    // Find the device in the map by deviceId
-    let found: DanteDeviceState | undefined
+    // Aggregate worst-case LED across all discovered Dante devices
+    let worstStatus: 'GREEN' | 'AMBER' | 'RED' | 'GREY' = 'GREEN'
+    let latestSeen: string | null = null
+
     for (const state of this._devices.values()) {
-      if (state.deviceId === _deviceId) {
-        found = state
+      if (state.ledStatus === 'RED') {
+        worstStatus = 'RED'
         break
+      }
+      if (state.ledStatus === 'AMBER' && worstStatus !== 'RED') worstStatus = 'AMBER'
+      if (state.ledStatus === 'GREY' && worstStatus === 'GREEN') worstStatus = 'GREY'
+      if (state.lastHeartbeat) {
+        const ts = state.lastHeartbeat.toISOString()
+        if (!latestSeen || ts > latestSeen) latestSeen = ts
       }
     }
 
-    if (!found) {
-      return { deviceId: _deviceId, status: 'GREY', lastSeen: null }
-    }
+    // If devices discovered via mDNS but ARC not yet queried (all GREY) → AMBER
+    if (worstStatus === 'GREY' && this._devices.size > 0) worstStatus = 'AMBER'
 
-    return {
-      deviceId: _deviceId,
-      status: found.ledStatus,
-      lastSeen: found.lastHeartbeat?.toISOString() ?? null,
-    }
+    return { deviceId: anchorId, status: worstStatus, lastSeen: latestSeen }
   }
 
   async downloadConfig(_deviceId: string): Promise<Record<string, unknown>> {
@@ -285,7 +303,7 @@ export class DanteModule extends EventEmitter implements DeviceModule {
     if (!state) {
       state = {
         id: randomUUID(),
-        deviceId: randomUUID(),   // Will be overridden when linked to DB device record
+        deviceId: this._anchorDeviceId ?? randomUUID(),
         danteName: name,
         displayName: null,
         model: null,
