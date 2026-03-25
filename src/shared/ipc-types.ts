@@ -271,3 +271,93 @@ export interface ZoomImportResponse {
   skipped: number
   errors: string[]
 }
+
+// ── Dante Network Audio ──────────────────────────────────────────────────────
+
+export type DanteChannelSnapshot = {
+  channelNumber: number
+  channelName: string
+  direction: 'tx' | 'rx'
+  gainLevel: string | null
+  subscription?: {
+    txDeviceName: string
+    txChannelName: string
+    status: 'connected' | 'unresolved' | 'self-loop' | 'unsubscribed'
+  }
+}
+
+export type DanteDeviceSnapshot = {
+  id: string
+  deviceId: string
+  danteName: string
+  displayName: string | null
+  model: string | null
+  ipAddress: string
+  macAddress: string | null
+  sampleRate: number | null
+  encoding: number | null
+  latencyNs: number | null
+  txChannelCount: number
+  rxChannelCount: number
+  isAvio: boolean
+  ledStatus: 'GREEN' | 'AMBER' | 'RED' | 'GREY'
+  txChannels: DanteChannelSnapshot[]
+  rxChannels: DanteChannelSnapshot[]
+}
+
+export type DanteScanResponse = {
+  success: boolean
+  devices: DanteDeviceSnapshot[]
+  error?: string
+}
+
+export type DanteDeviceGetRequest = { deviceId: string }
+
+export type DanteSubscribeRequest = {
+  rxDeviceId: string
+  rxChannelNum: number
+  txDeviceName: string
+  txChannelName: string
+}
+
+export type DanteSubscribeResponse = {
+  success: boolean
+  status?: 'connected' | 'unresolved'
+  error?: string
+}
+
+export type DanteUnsubscribeRequest = {
+  rxDeviceId: string
+  rxChannelNum: number
+}
+
+export type DanteSettingsSetRequest = {
+  deviceId: string
+  sampleRate?: 44100 | 48000 | 88200 | 96000 | 176400 | 192000
+  encoding?: 16 | 24 | 32
+  latencyNs?: number
+}
+
+export type DanteRenameDeviceRequest = {
+  deviceId: string
+  newName: string
+}
+
+export type DanteRenameChannelRequest = {
+  deviceId: string
+  direction: 'tx' | 'rx'
+  channelNum: number
+  newName: string
+}
+
+export type DanteGainSetRequest = {
+  deviceId: string
+  direction: 'tx' | 'rx'
+  channelNum: number
+  gainLevel: '+24 dBu' | '+18 dBu' | '+4 dBu' | '0 dBu' | '0 dBV' | '-10 dBV'
+}
+
+export type DanteUpdateBroadcast = {
+  timestamp: string
+  devices: DanteDeviceSnapshot[]
+}

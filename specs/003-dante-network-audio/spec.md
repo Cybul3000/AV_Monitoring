@@ -53,7 +53,7 @@ An AV technician needs to route audio from one Dante device's transmit channel t
 
 1. **Given** two Dante devices are present with available transmit and receive channels, **When** the operator creates a subscription from a transmit channel to a receive channel, **Then** the new subscription appears as connected in the routing view.
 2. **Given** an existing subscription is in place, **When** the operator removes it, **Then** the receive channel is no longer shown as subscribed to that transmit source.
-3. **Given** the operator attempts to subscribe a receive channel that is already connected to another source, **When** the action is submitted, **Then** the system either replaces the existing subscription or rejects the operation with a clear explanation.
+3. **Given** the operator attempts to subscribe a receive channel that is already connected to another source, **When** the action is submitted, **Then** the system rejects the operation with a clear error message indicating the channel is already subscribed, and the operator must explicitly remove the existing subscription first before creating a new one.
 4. **Given** a target device or channel name does not exist on the network, **When** the operator tries to create a subscription, **Then** the system reports that the device or channel was not found.
 
 ---
@@ -107,17 +107,17 @@ An AV technician working with AVIO analog interface adaptors needs to read and s
 
 ### Functional Requirements
 
-- **FR-001**: The system MUST discover all Dante-enabled devices on the local network without requiring manual IP address configuration.
+- **FR-001**: The system MUST discover all Dante-enabled devices on the local network without requiring manual IP address configuration. The module MUST continuously watch mDNS for device additions and removals (passive, event-driven). A manual full-rescan (re-querying ARC for channel lists and subscriptions) MUST also be available on operator request.
 - **FR-002**: The system MUST display each discovered device's name, IPv4 address, model identifier, and sample rate.
 - **FR-003**: The system MUST display the number of transmit channels and receive channels for each discovered device.
 - **FR-004**: The system MUST list all active audio subscription routes, showing for each entry: receive device name, receive channel name, transmit device name, transmit channel name, and connection status.
 - **FR-005**: The system MUST identify and display the connection status of each subscription as one of: connected (unicast), unresolved, or subscribed to own signal.
-- **FR-006**: The system MUST allow an operator to create a new audio subscription by specifying a transmit device, transmit channel, receive device, and receive channel.
+- **FR-006**: The system MUST allow an operator to create a new audio subscription by specifying a transmit device, transmit channel, receive device, and receive channel. If the receive channel already has an active subscription, the system MUST reject the request with an explicit error; the operator must remove the existing subscription first.
 - **FR-007**: The system MUST allow an operator to remove an existing subscription from a receive channel by specifying the receive device and receive channel.
 - **FR-008**: The system MUST display and allow updating the sample rate for any discovered device that supports sample rate changes. Supported values are 44100, 48000, 88200, 96000, 176400, and 192000 Hz.
 - **FR-009**: The system MUST display and allow updating the audio encoding bit depth for any discovered device. Supported values are 16, 24, and 32 bit.
 - **FR-010**: The system MUST display and allow updating the network latency for any discovered device, expressed in milliseconds.
-- **FR-011**: The system MUST allow renaming a device and resetting a device name to its factory default.
+- **FR-011**: The system MUST allow renaming a device's Dante name (the ARC protocol name used in subscription routing) and resetting it to the device's factory default. The display name (opcode 0x1003 label) is read-only metadata and is not settable.
 - **FR-012**: The system MUST allow renaming an individual transmit or receive channel on a device, and resetting a channel name to its factory default.
 - **FR-013**: The system MUST display and allow setting the analog gain level on AVIO input channels from the supported input gain values.
 - **FR-014**: The system MUST display and allow setting the analog gain level on AVIO output channels from the supported output gain values.
@@ -126,7 +126,7 @@ An AV technician working with AVIO analog interface adaptors needs to read and s
 
 ### Key Entities
 
-- **Dante Device**: A networked audio endpoint that participates in the Dante protocol. Key properties: device name, IP address, MAC address, model identifier, sample rate, encoding bit depth, network latency, and list of transmit and receive channels.
+- **Dante Device**: A networked audio endpoint that participates in the Dante protocol. Key properties: Dante name (ARC protocol name, mutable, used in subscription routing), display name (read-only human-readable label from opcode 0x1003), IP address, MAC address, model identifier, sample rate, encoding bit depth, network latency, and list of transmit and receive channels. The MAC address is the stable unique identifier — it persists across device renames and IP address changes. Two devices with the same Dante name are disambiguated by MAC address.
 - **Transmit Channel**: A named audio output channel on a Dante device. Key properties: channel number, channel name, device association.
 - **Receive Channel**: A named audio input channel on a Dante device that can subscribe to a transmit channel from any device on the network. Key properties: channel number, channel name, device association, current subscription status.
 - **Subscription**: An audio routing link from a transmit channel to a receive channel, potentially across different devices. Key properties: transmit device name, transmit channel name, receive device name, receive channel name, connection status.
@@ -139,10 +139,20 @@ An AV technician working with AVIO analog interface adaptors needs to read and s
 
 - **SC-001**: All Dante devices active on the local network are discovered and listed within 10 seconds of initiating a scan on a network with up to 50 devices.
 - **SC-002**: An operator can view the complete routing subscription map for the entire network in a single query without needing to inspect each device individually.
-- **SC-003**: An operator can add or remove an audio subscription in under 30 seconds from identifying the source and destination channels.
+- **SC-003**: An operator can add or remove an audio subscription in under 30 seconds from identifying the source and destination channels. Write commands (subscribe, unsubscribe, rename, settings change) sent over ARC/Settings UDP MUST time out after 10 seconds if no device acknowledgement is received, and the system MUST report the operation as failed.
 - **SC-004**: All read operations (device list, channel list, subscription list) return results in under 5 seconds on a local network segment under normal load.
 - **SC-005**: Device configuration changes (sample rate, encoding, latency) are confirmed and reflected in a subsequent query without requiring a manual page refresh or service restart.
 - **SC-006**: Device and channel rename operations complete and are discoverable on the next network scan without additional manual steps.
+
+## Clarifications
+
+### Session 2026-03-24
+
+- Q: When creating a subscription on an RX channel that already has one, should the system replace silently, confirm before replacing, or reject? → A: Reject — the system must reject the operation with a clear error; the operator must explicitly remove the existing subscription before creating a new one.
+- Q: What is the stable unique identifier for a Dante device in the app's database? → A: MAC address — stable across renames and DHCP IP changes; always present in mDNS CMC record.
+- Q: After initial scan, should the module continuously re-discover devices or only on manual trigger? → A: Continuous mDNS watch (passive, event-driven for add/remove) plus manual full-rescan for ARC channel/subscription data.
+- Q: What timeout applies to write operations (subscribe, rename, settings change) over ARC/Settings UDP? → A: 10 seconds — system must report the operation as failed if no device acknowledgement is received within 10 s.
+- Q: "Rename a device" (FR-011) targets which name — Dante name, display name, or both? → A: Dante name only — the ARC protocol name used in subscription routing. Display name is read-only.
 
 ## Assumptions
 

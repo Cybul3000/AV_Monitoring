@@ -59,6 +59,14 @@
       ]
     },
     {
+      "type": "dante-network-audio",
+      "label": "Dante Network Audio",
+      "configFields": [
+        { "key": "host", "label": "IP Address", "type": "text", "required": true },
+        { "key": "arcPort", "label": "ARC Port", "type": "number", "required": false, "default": 4440, "hint": "Default 4440 — overridden by mDNS if discovered automatically" }
+      ]
+    },
+    {
       "type": "biamp-tesira",
       "label": "Biamp Tesira DSP",
       "module": "BiampTesiraModule",

@@ -7,6 +7,7 @@ import { ZoomModule } from './zoom/ZoomModule'
 import { LGDisplayModule } from './lg-display/LGDisplayModule'
 import { LightwareModule } from './lightware/LightwareModule'
 import { BiampTesiraModule } from './biamp-tesira/BiampTesiraModule'
+import { DanteModule } from './dante/DanteModule'
 
 // Lazily-loaded module instances keyed by device type
 const _modules = new Map<string, DeviceModule>()
@@ -109,4 +110,5 @@ export function registerAllModules(): void {
   // registerModule('crestron-ssh', () => new CrestronSSHModule())
   registerModule('lightware-matrix', () => new LightwareModule())
   registerModule('biamp-tesira', () => new BiampTesiraModule())
+  registerModule('dante-network-audio', () => new DanteModule())
 }

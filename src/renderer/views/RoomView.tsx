@@ -5,6 +5,7 @@ import { ConfigPanel } from '../components/ConfigPanel'
 import { LGDisplayPanel } from '../components/DeviceDetail/LGDisplayPanel/LGDisplayPanel'
 import { LightwarePanel } from '../components/DeviceDetail/LightwarePanel/LightwarePanel'
 import { BiampTesiraPanel } from '../components/DeviceDetail/BiampTesiraPanel/BiampTesiraPanel'
+import { DantePanel } from '../components/DantePanel/DantePanel'
 import { useHierarchy } from '../hooks/useHierarchy'
 import { useDeviceStatus } from '../hooks/useDeviceStatus'
 import type { HierarchyNode } from '@shared/ipc-types'
@@ -208,6 +209,12 @@ export const RoomView: React.FC<Props> = ({ regionId, officeId, floorId, roomId 
                     meta={getDeviceMeta(selectedDevice.id)}
                     onCommand={(command, params) => void handleAction(selectedDevice.id, command, params)}
                   />
+                </div>
+              )}
+
+              {selectedDevice.deviceType === 'dante-network-audio' && (
+                <div style={{ marginTop: 'var(--spacing-lg)' }}>
+                  <DantePanel />
                 </div>
               )}
             </div>
