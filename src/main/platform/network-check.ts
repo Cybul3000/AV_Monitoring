@@ -3,8 +3,10 @@ import { execSync } from 'child_process'
 import type { NetworkStatus } from '@shared/ipc-types'
 
 const MEETING_ROOM_SSID = 'MeetingRoom'
-// VPN range: 10.x.6.0/23 — matches 10.*.6.0–10.*.7.255
-const VPN_REGEX = /^10\.\d+\.[67]\./
+// VPN interface name prefixes — more reliable than IP range matching
+// macOS: utun (IKEv2/WireGuard/L2TP), ppp (L2TP/PPTP)
+// Linux/Windows: tun, tap, ppp
+const VPN_IFACE_PREFIXES = ['utun', 'tun', 'tap', 'ppp']
 
 export function checkNetworkStatus(): NetworkStatus {
   return {
@@ -17,12 +19,12 @@ export function checkNetworkStatus(): NetworkStatus {
 
 function isVpnActive(): boolean {
   const ifaces = networkInterfaces()
-  for (const iface of Object.values(ifaces)) {
-    if (!iface) continue
-    for (const addr of iface) {
-      if (addr.family === 'IPv4' && VPN_REGEX.test(addr.address)) {
-        return true
-      }
+  for (const [name, addrs] of Object.entries(ifaces)) {
+    if (!addrs) continue
+    const lname = name.toLowerCase()
+    const isVpnIface = VPN_IFACE_PREFIXES.some(prefix => lname.startsWith(prefix))
+    if (isVpnIface && addrs.some(a => a.family === 'IPv4' && !a.internal)) {
+      return true
     }
   }
   return false

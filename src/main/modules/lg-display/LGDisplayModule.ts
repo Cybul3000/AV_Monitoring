@@ -9,7 +9,7 @@ import { LGTCPTransport } from './LGTCPTransport'
 import type { LEDStatus } from '../_base/DeviceModule'
 
 const DEFAULT_PORT = 9761
-const DEFAULT_POLL_INTERVAL_MS = 5_000
+const DEFAULT_POLL_INTERVAL_MS = 30_000
 
 // Input source hex codes → human-readable labels
 const INPUT_CODE_MAP: Record<number, string> = {
@@ -80,6 +80,7 @@ export class LGDisplayModule implements DeviceModule {
     const pollIntervalMs = (config.options?.pollInterval as number | undefined) ?? DEFAULT_POLL_INTERVAL_MS
 
     const transport = new LGTCPTransport()
+    transport.verbose = !!(process.env.ELECTRON_RENDERER_URL) // dev mode
     transport.setSetId(setId)
 
     const initialState: LGDeviceState = {
@@ -140,17 +141,6 @@ export class LGDisplayModule implements DeviceModule {
   // ── Ping ───────────────────────────────────────────────────────────────────
 
   async ping(deviceId: string): Promise<DeviceStatus> {
-    try {
-      await this._pollDevice(deviceId)
-    } catch (err) {
-      return {
-        deviceId,
-        status: 'RED',
-        lastSeen: null,
-        meta: this._buildMeta(deviceId)
-      }
-    }
-
     const device = this._devices.get(deviceId)
     if (!device) {
       return { deviceId, status: 'RED', lastSeen: null }

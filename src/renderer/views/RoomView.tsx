@@ -28,6 +28,7 @@ export const RoomView: React.FC<Props> = ({ regionId, officeId, floorId, roomId 
   const { roots, update } = useHierarchy()
   const { getDeviceStatus, getDeviceMeta } = useDeviceStatus()
   const [pendingAction, setPendingAction] = useState<{ deviceId: string; command: string; label: string; params?: Record<string, unknown> } | null>(null)
+  const [pendingDelete, setPendingDelete] = useState<{ deviceId: string; deviceName: string } | null>(null)
   const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(null)
   const [showAddDevice, setShowAddDevice] = useState(false)
   const [actionResult, setActionResult] = useState<{ message: string; ok: boolean } | null>(null)
@@ -93,6 +94,7 @@ export const RoomView: React.FC<Props> = ({ regionId, officeId, floorId, roomId 
                 status={getDeviceStatus(device.id)}
                 selected={device.id === selectedDeviceId}
                 onClick={() => setSelectedDeviceId(device.id === selectedDeviceId ? null : device.id)}
+                onDelete={() => setPendingDelete({ deviceId: device.id, deviceName: device.name })}
               />
             ))}
           </div>
@@ -242,6 +244,21 @@ export const RoomView: React.FC<Props> = ({ regionId, officeId, floorId, roomId 
         />
       )}
 
+      {pendingDelete && (
+        <ConfirmActionDialog
+          title="Remove Device"
+          message={`Remove "${pendingDelete.deviceName}" from this room? This cannot be undone.`}
+          confirmLabel="Remove"
+          danger
+          onConfirm={async () => {
+            await update({ action: 'delete', type: 'device', id: pendingDelete.deviceId })
+            if (selectedDeviceId === pendingDelete.deviceId) setSelectedDeviceId(null)
+            setPendingDelete(null)
+          }}
+          onCancel={() => setPendingDelete(null)}
+        />
+      )}
+
       {showAddDevice && (
         <div style={styles.overlay} onClick={() => setShowAddDevice(false)}>
           <div style={styles.modal} onClick={e => e.stopPropagation()}>
@@ -262,24 +279,44 @@ const DeviceRow: React.FC<{
   status: string
   selected: boolean
   onClick: () => void
-}> = ({ device, status, selected, onClick }) => (
-  <button
-    onClick={onClick}
+  onDelete: () => void
+}> = ({ device, status, selected, onClick, onDelete }) => (
+  <div
     style={{
-      display: 'flex', alignItems: 'center', gap: 'var(--spacing-md)',
-      padding: 'var(--spacing-md)', background: selected ? 'var(--color-bg-elevated)' : 'var(--color-bg-surface)',
+      display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)',
       border: `1px solid ${selected ? 'var(--color-accent)' : 'var(--color-border)'}`,
-      borderRadius: 'var(--radius-md)', cursor: 'pointer', textAlign: 'left' as const, width: '100%'
+      borderRadius: 'var(--radius-md)', background: selected ? 'var(--color-bg-elevated)' : 'var(--color-bg-surface)',
+      overflow: 'hidden'
     }}
   >
-    <LEDIndicator status={status as 'GREEN' | 'AMBER' | 'RED' | 'GREY'} size="md" />
-    <div style={{ flex: 1 }}>
-      <div style={{ fontWeight: 600 }}>{device.name}</div>
-      <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)' }}>
-        {device.deviceType} · {device.host}
+    <button
+      onClick={onClick}
+      style={{
+        display: 'flex', alignItems: 'center', gap: 'var(--spacing-md)',
+        padding: 'var(--spacing-md)', background: 'none', border: 'none',
+        cursor: 'pointer', textAlign: 'left' as const, flex: 1
+      }}
+    >
+      <LEDIndicator status={status as 'GREEN' | 'AMBER' | 'RED' | 'GREY'} size="md" />
+      <div style={{ flex: 1 }}>
+        <div style={{ fontWeight: 600 }}>{device.name}</div>
+        <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)' }}>
+          {device.deviceType} · {device.host}
+        </div>
       </div>
-    </div>
-  </button>
+    </button>
+    <button
+      onClick={e => { e.stopPropagation(); onDelete() }}
+      title="Remove device"
+      style={{
+        padding: '4px 8px', marginRight: 'var(--spacing-xs)', background: 'none',
+        border: 'none', color: 'var(--color-text-muted)', cursor: 'pointer',
+        fontSize: '1rem', lineHeight: 1, borderRadius: 'var(--radius-sm)'
+      }}
+    >
+      ×
+    </button>
+  </div>
 )
 
 const styles = {

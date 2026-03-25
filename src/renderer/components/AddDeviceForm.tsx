@@ -18,6 +18,7 @@ interface DeviceTypeEntry {
 
 type ApiShape = {
   registryList: () => Promise<{ success: boolean; entries?: DeviceTypeEntry[]; error?: string }>
+  deviceCheckHost: (host: string) => Promise<{ exists: boolean; device: { id: string; name: string; roomName: string } | null }>
 }
 
 interface Props {
@@ -40,7 +41,7 @@ export const AddDeviceForm: React.FC<Props> = ({ onAdd, onCancel }) => {
   const [host, setHost] = useState('')
   const [port, setPort] = useState('')
   const [fields, setFields] = useState<Record<string, string>>({})
-  const [duplicateWarning, setDuplicateWarning] = useState(false)
+  const [duplicateWarning, setDuplicateWarning] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
 
   useEffect(() => {
@@ -71,9 +72,20 @@ export const AddDeviceForm: React.FC<Props> = ({ onAdd, onCancel }) => {
 
   const selected = deviceTypes.find(dt => dt.type === selectedType)
 
-  const handleHostBlur = () => {
-    // In a real implementation, check for duplicate IPs via IPC
-    setDuplicateWarning(false)
+  const handleHostBlur = async () => {
+    const trimmed = host.trim()
+    if (!trimmed) { setDuplicateWarning(null); return }
+    try {
+      const api = window.api as unknown as ApiShape
+      const res = await api.deviceCheckHost(trimmed)
+      if (res.exists && res.device) {
+        setDuplicateWarning(`Already used by "${res.device.name}" in ${res.device.roomName}`)
+      } else {
+        setDuplicateWarning(null)
+      }
+    } catch {
+      setDuplicateWarning(null)
+    }
   }
 
   const handleSubmit = async () => {
@@ -145,10 +157,10 @@ export const AddDeviceForm: React.FC<Props> = ({ onAdd, onCancel }) => {
         placeholder="e.g., 10.0.6.100"
         value={host}
         onChange={e => setHost(e.target.value)}
-        onBlur={handleHostBlur}
+        onBlur={() => void handleHostBlur()}
       />
       {duplicateWarning && (
-        <div style={styles.warning}>Warning: This IP is already used by another device.</div>
+        <div style={styles.warning}>Warning: {duplicateWarning}</div>
       )}
 
       <label style={styles.label}>Port (optional)</label>

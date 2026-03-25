@@ -23,41 +23,18 @@ export const NetworkBadge: React.FC = () => {
 
   if (!status) return null
 
-  const active = status.vpnActive || status.ssidMatch
-  const label = status.vpnActive
-    ? 'VPN'
-    : status.ssidMatch
-      ? 'MeetingRoom WiFi'
-      : status.currentSsid
-        ? `WiFi: ${status.currentSsid}`
-        : 'No LAN'
+  const label = status.vpnActive ? 'VPN: On' : 'VPN: Off'
 
   return (
     <span
-      title={`Network: ${label} — ${active ? 'LAN accessible' : 'LAN may be unreachable'}`}
+      title={label}
       style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        gap: 'var(--spacing-xs)',
-        padding: '2px 8px',
-        borderRadius: 'var(--radius-full)',
         fontSize: 'var(--font-size-xs)',
-        fontWeight: 600,
-        background: active ? 'rgba(34,197,94,0.15)' : 'rgba(239,68,68,0.15)',
-        color: active ? 'var(--color-green)' : 'var(--color-red)',
-        border: `1px solid ${active ? 'var(--color-green)' : 'var(--color-red)'}`,
+        fontWeight: 500,
+        color: 'var(--color-text-secondary)',
         userSelect: 'none'
       }}
     >
-      <span
-        style={{
-          width: 6,
-          height: 6,
-          borderRadius: '50%',
-          background: active ? 'var(--color-green)' : 'var(--color-red)',
-          flexShrink: 0
-        }}
-      />
       {label}
     </span>
   )
