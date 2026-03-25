@@ -12,6 +12,7 @@ import { registerOtelHandlers } from './ipc/otel-handlers'
 import { registerZoomHandlers } from './ipc/zoom-handlers'
 import { registerSettingsHandlers } from './ipc/settings-handlers'
 import { registerAlertHandlers } from './ipc/alert-handlers'
+import { registerDanteHandlers } from './ipc/dante-handlers'
 import { buildMenu } from './menu'
 import { createTray } from './tray'
 import { getPreference, setPreference } from './preferences'
@@ -80,6 +81,7 @@ function createWindow(): void {
   registerZoomHandlers()
   registerSettingsHandlers()
   registerAlertHandlers()
+  registerDanteHandlers(mainWindow)
 
   // Start device polling
   startPolling(mainWindow)

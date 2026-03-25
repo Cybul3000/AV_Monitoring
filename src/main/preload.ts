@@ -29,7 +29,17 @@ import type {
   ZoomImportResponse,
   AlertRulesGetRequest,
   AlertRulesGetResponse,
-  AlertRuleSetRequest
+  AlertRuleSetRequest,
+  DanteScanResponse,
+  DanteDeviceGetRequest,
+  DanteUpdateBroadcast,
+  DanteSubscribeRequest,
+  DanteSubscribeResponse,
+  DanteUnsubscribeRequest,
+  DanteSettingsSetRequest,
+  DanteRenameDeviceRequest,
+  DanteRenameChannelRequest,
+  DanteGainSetRequest,
 } from '@shared/ipc-types'
 
 const api = {
@@ -150,7 +160,40 @@ const api = {
 
   // ── Dialogs ───────────────────────────────────────────────────────────────
   selectFile: (options?: { filters?: Array<{ name: string; extensions: string[] }> }): Promise<string | null> =>
-    ipcRenderer.invoke('dialog:selectFile', options)
+    ipcRenderer.invoke('dialog:selectFile', options),
+
+  // ── Dante Network Audio ───────────────────────────────────────────────────
+  dante: {
+    scan: (): Promise<DanteScanResponse> =>
+      ipcRenderer.invoke('dante:scan'),
+
+    deviceGet: (req: DanteDeviceGetRequest): Promise<{ success: boolean; device: DanteScanResponse['devices'][number] | null; error?: string }> =>
+      ipcRenderer.invoke('dante:device:get', req),
+
+    subscribe: (req: DanteSubscribeRequest): Promise<DanteSubscribeResponse> =>
+      ipcRenderer.invoke('dante:subscribe', req),
+
+    unsubscribe: (req: DanteUnsubscribeRequest): Promise<{ success: boolean; error?: string }> =>
+      ipcRenderer.invoke('dante:unsubscribe', req),
+
+    settingsSet: (req: DanteSettingsSetRequest): Promise<{ success: boolean; error?: string }> =>
+      ipcRenderer.invoke('dante:settings:set', req),
+
+    renameDevice: (req: DanteRenameDeviceRequest): Promise<{ success: boolean; error?: string }> =>
+      ipcRenderer.invoke('dante:rename:device', req),
+
+    renameChannel: (req: DanteRenameChannelRequest): Promise<{ success: boolean; error?: string }> =>
+      ipcRenderer.invoke('dante:rename:channel', req),
+
+    gainSet: (req: DanteGainSetRequest): Promise<{ success: boolean; error?: string }> =>
+      ipcRenderer.invoke('dante:gain:set', req),
+
+    onUpdate: (cb: (payload: DanteUpdateBroadcast) => void): (() => void) => {
+      const handler = (_: Electron.IpcRendererEvent, payload: DanteUpdateBroadcast) => cb(payload)
+      ipcRenderer.on('dante:update', handler)
+      return () => ipcRenderer.removeListener('dante:update', handler)
+    },
+  },
 }
 
 contextBridge.exposeInMainWorld('api', api)
