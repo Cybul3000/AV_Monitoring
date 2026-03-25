@@ -43,8 +43,6 @@ export const LGDisplayPanel: React.FC<Props> = ({ device: _device, meta, onComma
   const screenMute = (optimistic.screenMute !== undefined ? optimistic.screenMute : meta.screenMute) as boolean | null | undefined
   const volumeMute = (optimistic.volumeMute !== undefined ? optimistic.volumeMute : meta.volumeMute) as boolean | null | undefined
   const volume     = (optimistic.volume     !== undefined ? optimistic.volume     : meta.volume)     as number | null | undefined
-  const connected  = meta.connected as boolean | undefined
-
   const handleCommand = async (command: string, params?: Record<string, unknown>) => {
     // Apply optimistic update immediately
     switch (command) {
@@ -111,12 +109,6 @@ export const LGDisplayPanel: React.FC<Props> = ({ device: _device, meta, onComma
 
   return (
     <div style={styles.root}>
-
-      {connected === false && (
-        <div style={styles.banner}>
-          Device unreachable — attempting to reconnect
-        </div>
-      )}
 
       {/* ── Power ── */}
       <section style={styles.section}>
@@ -280,14 +272,6 @@ const styles = {
     background: 'var(--color-bg-surface)',
     borderRadius: 'var(--radius-md)',
     border: '1px solid var(--color-border)'
-  },
-  banner: {
-    padding: 'var(--spacing-sm) var(--spacing-md)',
-    background: 'rgba(239,68,68,0.08)',
-    border: '1px solid var(--color-red)',
-    borderRadius: 'var(--radius-md)',
-    fontSize: 'var(--font-size-sm)',
-    color: 'var(--color-red)'
   },
   feedbackBar: {
     padding: '6px var(--spacing-md)',
