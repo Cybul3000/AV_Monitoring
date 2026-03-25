@@ -44,6 +44,7 @@ export function registerDeviceHandlers(win: BrowserWindow): void {
       const entries = getRegistryEntries().map(e => ({
         type: e.type,
         label: e.label,
+        port: e.port,
         configFields: e.configFields,
         moduleAvailable: isModuleAvailable(e.type)
       }))
