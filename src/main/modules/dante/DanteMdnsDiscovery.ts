@@ -38,11 +38,11 @@ export class DanteMdnsDiscovery extends EventEmitter {
   private _records = new Map<string, ServiceRecord>()
   private _active = false
 
-  start(): void {
+  start(networkInterfaceIp?: string): void {
     if (this._active) return
     this._active = true
 
-    this._mdns = multicastDns()
+    this._mdns = multicastDns(networkInterfaceIp ? { interface: networkInterfaceIp } : undefined)
 
     this._mdns.on('response', (response: MDNSPacket) => {
       this._handleResponse(response)

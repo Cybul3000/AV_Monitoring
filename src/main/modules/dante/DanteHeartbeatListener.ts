@@ -27,7 +27,7 @@ export class DanteHeartbeatListener extends EventEmitter {
   private _timers = new Map<string, ReturnType<typeof setTimeout>>()
   private _active = false
 
-  start(): void {
+  start(networkInterfaceIp?: string): void {
     if (this._active) return
     this._active = true
 
@@ -44,7 +44,7 @@ export class DanteHeartbeatListener extends EventEmitter {
     })
 
     socket.bind(HEARTBEAT_PORT, '0.0.0.0', () => {
-      this._joinMulticastGroups(socket)
+      this._joinMulticastGroups(socket, networkInterfaceIp)
     })
   }
 
@@ -64,7 +64,14 @@ export class DanteHeartbeatListener extends EventEmitter {
     }
   }
 
-  private _joinMulticastGroups(socket: dgram.Socket): void {
+  private _joinMulticastGroups(socket: dgram.Socket, networkInterfaceIp?: string): void {
+    if (networkInterfaceIp) {
+      try {
+        socket.addMembership(MULTICAST_GROUP, networkInterfaceIp)
+      } catch { /* ignore */ }
+      return
+    }
+
     if (process.platform === 'darwin') {
       // Single addMembership on macOS
       try {

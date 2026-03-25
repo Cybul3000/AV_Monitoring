@@ -29,6 +29,7 @@ The Dante ARC/Settings protocol is proprietary and reverse-engineered (from `net
 |-----------|-------|-------|
 | I. Module-First | ✅ PASS | All Dante communication in `src/main/modules/dante/`. Module is independently testable. Protocol documented in `research.md` (reverse-engineered from `netaudio-lib`, no `/resources/dante/` upstream doc exists — see Complexity Tracking). |
 | II. Layered Hierarchy | ✅ PASS | Dante devices exist within Rooms; LED status aggregates upward. DantePanel rendered only within RoomView. |
+> **Correction (spec 007)**: The original plan noted Dante devices exist within Rooms as device-per-endpoint. Corrected to singleton-gateway — one `devices` row = Dante Network gateway; all discovered endpoints in `dante_devices` only.
 | III. Verify, Never Assume | ✅ PASS | All protocol details confirmed from `netaudio-lib` source. No NEEDS CLARIFICATION items remain. |
 | IV. Test-First | ✅ PASS | All tasks follow red→green→refactor. Unit tests for packet codec and transport; integration tests for IPC handlers. |
 | V. Device Registry | ✅ PASS | `dante-network-audio` registry entry and `DanteModule` created together. |
