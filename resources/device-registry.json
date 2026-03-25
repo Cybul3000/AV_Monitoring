@@ -1,0 +1,75 @@
+{
+  "version": "1.0.0",
+  "devices": [
+    {
+      "type": "zoom-room",
+      "label": "Zoom Rooms Controller",
+      "module": "ZoomModule",
+      "protocol": "REST/HTTPS",
+      "port": null,
+      "configFields": [
+        { "key": "accountId",    "label": "Zoom Account ID",     "secret": false },
+        { "key": "clientId",     "label": "OAuth Client ID",     "secret": false },
+        { "key": "clientSecret", "label": "OAuth Client Secret", "secret": true  }
+      ]
+    },
+    {
+      "type": "lg-display",
+      "label": "LG Pro Display",
+      "module": "LGDisplayModule",
+      "protocol": "TCP",
+      "port": 9761,
+      "configFields": [
+        { "key": "host", "label": "IP Address", "secret": false }
+      ]
+    },
+    {
+      "type": "dante-audio",
+      "label": "Dante Network Audio Device",
+      "module": "DanteModule",
+      "protocol": "mDNS/UDP",
+      "port": null,
+      "configFields": [
+        { "key": "deviceName", "label": "Dante Device Name (mDNS)", "secret": false }
+      ]
+    },
+    {
+      "type": "crestron-ssh",
+      "label": "Crestron Series 3/4 (SSH)",
+      "module": "CrestronSSHModule",
+      "protocol": "SSH",
+      "port": 22,
+      "configFields": [
+        { "key": "host",       "label": "IP Address",   "secret": false },
+        { "key": "username",   "label": "SSH Username", "secret": false },
+        { "key": "password",   "label": "SSH Password", "secret": true  },
+        { "key": "deviceType", "label": "Device Type",  "secret": false, "enum": ["CP4", "VC4"] }
+      ]
+    },
+    {
+      "type": "lightware-matrix",
+      "label": "Lightware Matrix Switcher",
+      "module": "LightwareModule",
+      "protocol": "TCP/LW3",
+      "port": 6107,
+      "configFields": [
+        { "key": "host",     "label": "IP Address",   "secret": false },
+        { "key": "username", "label": "LW3 Username", "secret": false },
+        { "key": "password", "label": "LW3 Password", "secret": true  }
+      ]
+    },
+    {
+      "type": "biamp-tesira",
+      "label": "Biamp Tesira DSP",
+      "module": "BiampTesiraModule",
+      "protocol": "TCP/TTP",
+      "port": 23,
+      "configFields": [
+        { "key": "host",        "label": "IP Address",                              "secret": false },
+        { "key": "username",    "label": "TTP Username",                            "secret": false },
+        { "key": "password",    "label": "TTP Password",                            "secret": true  },
+        { "key": "levelBlocks", "label": "LevelControl Block Paths (comma-separated)", "secret": false }
+      ]
+    }
+  ]
+}

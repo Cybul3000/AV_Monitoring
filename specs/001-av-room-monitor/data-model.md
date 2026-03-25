@@ -261,7 +261,17 @@ export interface DeviceStatus {
   deviceId: string;
   status: LEDStatus;
   lastSeen: string | null;       // ISO-8601
-  meta?: Record<string, unknown>; // module-specific additional state
+  meta?: Record<string, unknown>; // module-specific status points (e.g. micMuted, volumeLevel)
+}
+
+/**
+ * Describes a single monitorable status point exposed by a module.
+ * Used to populate AlertSettingsView and seed default alert_rules rows.
+ */
+export interface StatusPointDefinition {
+  id: string;            // stable snake_case key, e.g. 'mic_muted', 'hdmi_signal'
+  label: string;         // human-readable label shown in AlertSettingsView
+  defaultAlertable: boolean; // true = alert ON by default; false = informational only
 }
 
 export interface DeviceModule {
@@ -276,6 +286,13 @@ export interface DeviceModule {
 
   /** Request an immediate status check (outside poll interval) */
   ping(deviceId: string): Promise<DeviceStatus>;
+
+  /**
+   * Return all monitorable status points this module exposes.
+   * Called by AlertRulesService.seedDefaults() and AlertSettingsView.
+   * Must be a pure, synchronous declaration — no device I/O.
+   */
+  getStatusPoints(): StatusPointDefinition[];
 
   /** Download current device configuration as a serialisable object */
   downloadConfig(deviceId: string): Promise<Record<string, unknown>>;
@@ -300,6 +317,18 @@ export interface CommandResult {
   error?: string;
 }
 ```
+
+### Status Points: Zoom Module
+
+`ZoomModule.getStatusPoints()` MUST return:
+
+| id | label | defaultAlertable | Notes |
+|----|-------|-----------------|-------|
+| `reachable` | Device Reachable | `true` | RED when unreachable after N polls. Determined by ICMP/TCP probe — **no Zoom API call during polling**. |
+
+> The Zoom API is used exclusively for on-demand commands: `reboot`, `downloadConfig`, `restoreConfig`, `runSpeakerTest`. Mute state and volume are not polled or monitored.
+
+> Each device module in specs 002–006 MUST include an equivalent status-points table in its own spec, and implement `getStatusPoints()` to match.
 
 ---
 
