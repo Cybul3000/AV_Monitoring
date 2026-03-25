@@ -91,12 +91,14 @@ describe('LightwareModule', () => {
 
   it('getStatusPoints() returns expected status points', () => {
     const points = module.getStatusPoints()
-    expect(points).toHaveLength(3)
+    expect(points).toHaveLength(5)
 
     const ids = points.map(p => p.id)
     expect(ids).toContain('reachable')
     expect(ids).toContain('signal_locked')
     expect(ids).toContain('hardware_fault')
+    expect(ids).toContain('hdmi_input_signal')
+    expect(ids).toContain('usb_connected')
 
     const reachable = points.find(p => p.id === 'reachable')!
     expect(reachable.defaultAlertable).toBe(true)

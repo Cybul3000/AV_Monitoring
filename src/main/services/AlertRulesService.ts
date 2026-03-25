@@ -39,37 +39,62 @@ export class AlertRulesService {
   }
 
   /**
+   * Get the configured expected value for a value-based alert rule.
+   * Returns null if no expected value is set.
+   */
+  getExpectedValue(deviceType: string, statusPoint: string): string | null {
+    const db = getDb()
+    const row = db
+      .prepare(
+        'SELECT expected_value FROM alert_rules WHERE device_type = ? AND status_point = ?'
+      )
+      .get(deviceType, statusPoint) as { expected_value: string | null } | undefined
+
+    return row?.expected_value ?? null
+  }
+
+  /**
    * Upsert an alert rule (INSERT OR REPLACE).
    */
-  setRule(deviceType: string, statusPoint: string, enabled: boolean): void {
+  setRule(deviceType: string, statusPoint: string, enabled: boolean, expectedValue?: string | null): void {
     const db = getDb()
     db.prepare(
-      'INSERT OR REPLACE INTO alert_rules (device_type, status_point, alert_enabled) VALUES (?, ?, ?)'
-    ).run(deviceType, statusPoint, enabled ? 1 : 0)
+      'INSERT OR REPLACE INTO alert_rules (device_type, status_point, alert_enabled, expected_value) VALUES (?, ?, ?, ?)'
+    ).run(deviceType, statusPoint, enabled ? 1 : 0, expectedValue ?? null)
   }
 
   /**
    * Get all alert rules, optionally filtered by device type.
+   * Rules are enriched with options from each module's getStatusPoints().
    */
   getRules(deviceType?: string): AlertRule[] {
     const db = getDb()
-    let rows: Array<{ device_type: string; status_point: string; alert_enabled: number }>
+    let rows: Array<{ device_type: string; status_point: string; alert_enabled: number; expected_value: string | null }>
 
     if (deviceType) {
       rows = db
-        .prepare('SELECT device_type, status_point, alert_enabled FROM alert_rules WHERE device_type = ?')
+        .prepare('SELECT device_type, status_point, alert_enabled, expected_value FROM alert_rules WHERE device_type = ?')
         .all(deviceType) as typeof rows
     } else {
       rows = db
-        .prepare('SELECT device_type, status_point, alert_enabled FROM alert_rules')
+        .prepare('SELECT device_type, status_point, alert_enabled, expected_value FROM alert_rules')
         .all() as typeof rows
     }
 
-    return rows.map(r => ({
-      deviceType: r.device_type,
-      statusPoint: r.status_point,
-      alertEnabled: r.alert_enabled === 1
-    }))
+    return rows.map(r => {
+      const mod = getModule(r.device_type)
+      const point = mod?.getStatusPoints().find(p => p.id === r.status_point)
+      const rule: AlertRule = {
+        deviceType: r.device_type,
+        statusPoint: r.status_point,
+        alertEnabled: r.alert_enabled === 1,
+        expectedValue: r.expected_value,
+      }
+      if (point?.options !== undefined) {
+        rule.options = point.options
+      }
+      return rule
+    })
   }
 }
 

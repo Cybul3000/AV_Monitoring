@@ -16,6 +16,8 @@ export interface LightwareState {
   presets: Array<{ index: number; name: string }>
   temperature: number | null   // °C
   fanStatus: string | null     // 'OK', 'FAULT', or null
+  /** Active USB host source for H1 (e.g. 'U1', 'U2'). Empty string = no source connected. null = unknown. */
+  usbHostSource: string | null
   connected: boolean
   /** True once the transport has successfully emitted 'connected' at least once */
   hasEverConnected: boolean
@@ -32,6 +34,7 @@ export function createEmptyState(deviceId: string): LightwareState {
     presets: [],
     temperature: null,
     fanStatus: null,
+    usbHostSource: null,
     connected: false,
     hasEverConnected: false,
   }

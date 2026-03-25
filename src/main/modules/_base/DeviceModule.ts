@@ -17,6 +17,8 @@ export interface StatusPointDefinition {
   id: string              // stable snake_case key, e.g. 'reachable', 'hdmi_signal'
   label: string           // human-readable label for AlertSettingsView
   defaultAlertable: boolean // true = alert ON by default; false = informational only
+  /** If present, the rule supports an expected-value selector (dropdown or text). */
+  options?: string[]      // non-empty = render dropdown; empty = render text input
 }
 
 export interface DeviceConfig {

@@ -219,6 +219,9 @@ export interface AlertRule {
   deviceType: string
   statusPoint: string
   alertEnabled: boolean
+  expectedValue?: string | null
+  /** Available options from the module's getStatusPoints(). Non-empty = dropdown; empty array = text input; absent = no value selector. */
+  options?: string[]
 }
 
 export interface AlertRulesGetRequest {
@@ -233,6 +236,7 @@ export interface AlertRuleSetRequest {
   deviceType: string
   statusPoint: string
   alertEnabled: boolean
+  expectedValue?: string | null
 }
 
 // ── Settings Export/Import Channels ──────────────────────────────────────────

@@ -21,17 +21,20 @@ export function registerAlertHandlers(): void {
       }
 
       try {
-        alertRulesService.setRule(req.deviceType, req.statusPoint, req.alertEnabled)
+        alertRulesService.setRule(req.deviceType, req.statusPoint, req.alertEnabled, req.expectedValue)
 
         // Write audit log entry
         const db = getDb()
         const now = new Date().toISOString()
+        const detail = req.expectedValue != null
+          ? ` (expected: ${req.expectedValue})`
+          : ''
         db.prepare(
           `INSERT INTO events (id, severity, message, occurred_at) VALUES (?, ?, ?, ?)`
         ).run(
           randomUUID(),
           'INFO',
-          `Alert rule updated: ${req.deviceType}/${req.statusPoint} = ${req.alertEnabled}`,
+          `Alert rule updated: ${req.deviceType}/${req.statusPoint} = ${req.alertEnabled}${detail}`,
           now
         )
 
