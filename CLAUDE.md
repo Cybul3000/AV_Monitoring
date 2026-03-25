@@ -13,6 +13,8 @@ Auto-generated from all feature plans. Last updated: 2026-03-25
 - SQLite (`better-sqlite3`) — migration `005_dante.sql` adds `dante_devices`, `dante_channels`, `dante_subscriptions` (003-dante-network-audio)
 - TypeScript 5.x (Electron 30 main process, Node.js 20 LTS) + Node.js `net.Socket` (built-in) — no new npm packages (002-lg-pro-display)
 - SQLite (`better-sqlite3`) — shared `devices` table; no dedicated migration needed (002-lg-pro-display)
+- TypeScript 5.x (Electron 30 main process, Node.js 20 LTS) + No new dependencies — `os` (built-in, already used), `multicast-dns` (already in stack) (007-dante-network-monitor)
+- SQLite (`better-sqlite3`) — migration `005_dante.sql` unchanged; no new migration (007-dante-network-monitor)
 
 ## Project Structure
 
@@ -30,9 +32,9 @@ tests/
 : Follow standard conventions
 
 ## Recent Changes
+- 007-dante-network-monitor: Added TypeScript 5.x (Electron 30 main process, Node.js 20 LTS) + No new dependencies — `os` (built-in, already used), `multicast-dns` (already in stack)
 - 002-lg-pro-display: Added TypeScript 5.x (Electron 30 main process, Node.js 20 LTS) + Node.js `net.Socket` (built-in) — no new npm packages
 - 003-dante-network-audio: Completed US2–US5 — subscription management (ARC 0x3010/0x3014), settings validation (6 sample rates, 3 encodings), device/channel rename (ARC 0x1001), AVIO gain (Settings port 8700), DanteNotificationListener (multicast 224.0.0.231:8702), all IPC handlers (dante:subscribe, dante:unsubscribe, dante:settings:set, dante:rename:device, dante:rename:channel, dante:gain:set), renderer components (DanteSubscriptionTable, DanteSettingsForm); all 273 tests passing
-- 003-dante-network-audio: Added TypeScript 5.x (Electron 30 main process, Node.js 20 LTS) + `multicast-dns` (new, npm) + `dgram` / `Buffer` / `os` (built-in Node.js)
 
 <!-- MANUAL ADDITIONS START -->
 <!-- MANUAL ADDITIONS END -->

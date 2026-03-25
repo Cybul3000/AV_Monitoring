@@ -11,6 +11,7 @@ vi.mock('electron', () => ({
 
 const MIGRATION_001 = path.resolve(__dirname, '../../src/main/db/migrations/001_initial.sql')
 const MIGRATION_002 = path.resolve(__dirname, '../../src/main/db/migrations/002_alert_rules.sql')
+const MIGRATION_006 = path.resolve(__dirname, '../../src/main/db/migrations/006_alert_expected_value.sql')
 
 function createTestDb(): Database.Database {
   const db = new Database(':memory:')
@@ -18,6 +19,7 @@ function createTestDb(): Database.Database {
   db.pragma('foreign_keys = ON')
   db.exec(fs.readFileSync(MIGRATION_001, 'utf-8'))
   db.exec(fs.readFileSync(MIGRATION_002, 'utf-8'))
+  db.exec(fs.readFileSync(MIGRATION_006, 'utf-8'))
   return db
 }
 

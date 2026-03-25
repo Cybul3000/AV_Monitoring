@@ -16,6 +16,7 @@ import type {
 type PollingTimer = NodeJS.Timeout
 
 const _timers = new Map<string, PollingTimer>()
+const _deviceMeta = new Map<string, Record<string, unknown>>()
 let _win: BrowserWindow | null = null
 
 // ── Registration ──────────────────────────────────────────────────────────────
@@ -96,6 +97,7 @@ export function unscheduleDevice(deviceId: string): void {
     clearInterval(timer)
     _timers.delete(deviceId)
   }
+  _deviceMeta.delete(deviceId)
 }
 
 export async function connectDevice(
@@ -142,14 +144,16 @@ async function pollDevice(deviceId: string): Promise<void> {
   const module = getModule(row.device_type)
   let newStatus: LEDStatus = 'GREY'
   let lastSeen: string | null = null
+  let pingResult: Awaited<ReturnType<typeof module.ping>> | null = null
 
   if (!module) {
     newStatus = 'GREY'
   } else {
     try {
-      const result = await module.ping(deviceId)
-      newStatus = result.status
-      lastSeen = result.lastSeen ?? new Date().toISOString()
+      pingResult = await module.ping(deviceId)
+      newStatus = pingResult.status
+      lastSeen = pingResult.lastSeen ?? new Date().toISOString()
+      if (pingResult.meta) _deviceMeta.set(deviceId, pingResult.meta)
     } catch {
       // Count consecutive failures
       const failRow = db
@@ -169,6 +173,36 @@ async function pollDevice(deviceId: string): Promise<void> {
   if ((newStatus === 'AMBER' || newStatus === 'RED') &&
       !alertRulesService.isAlertable(row.device_type, 'reachable')) {
     newStatus = row.status
+  }
+
+  // Value-based alert: LG input_source — alert if actual input ≠ expected
+  if (newStatus !== 'RED' && pingResult?.meta?.input) {
+    const expectedInput = alertRulesService.getExpectedValue(row.device_type, 'input_source')
+    if (
+      expectedInput &&
+      pingResult.meta.input !== expectedInput &&
+      alertRulesService.isAlertable(row.device_type, 'input_source')
+    ) {
+      newStatus = 'AMBER'
+    }
+  }
+
+  // Value-based alert: Lightware hdmi_input_signal — alert if selected input port has no signal
+  if (newStatus !== 'RED' && pingResult?.meta?.ports) {
+    const monitoredInput = alertRulesService.getExpectedValue(row.device_type, 'hdmi_input_signal')
+    if (monitoredInput && alertRulesService.isAlertable(row.device_type, 'hdmi_input_signal')) {
+      const ports = pingResult.meta.ports as Array<{ portId: string; direction: string; signalLocked: boolean | null }>
+      const port = ports.find(p => p.portId === monitoredInput && p.direction === 'input')
+      if (port && port.signalLocked === false) newStatus = 'AMBER'
+    }
+  }
+
+  // Toggle alert: Lightware usb_connected — alert if USB host H1 has no connected source
+  if (newStatus !== 'RED' && pingResult?.meta !== undefined && alertRulesService.isAlertable(row.device_type, 'usb_connected')) {
+    const usbSource = pingResult.meta.usbHostSource as string | null | undefined
+    if (usbSource !== undefined && usbSource !== null && usbSource.trim() === '') {
+      newStatus = 'AMBER'
+    }
   }
 
   const now = new Date().toISOString()
@@ -244,7 +278,8 @@ export function broadcastStatus(): void {
       db
         .prepare('SELECT last_seen FROM devices WHERE id = ?')
         .get(d.id) as { last_seen: string | null }
-    ).last_seen
+    ).last_seen,
+    meta: _deviceMeta.get(d.id) ?? {}
   }))
 
   const broadcast: DeviceStatusBroadcast = {

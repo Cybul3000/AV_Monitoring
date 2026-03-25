@@ -88,19 +88,18 @@ describe('LGDisplayModule', () => {
   // ── getStatusPoints ────────────────────────────────────────────────────────
 
   describe('getStatusPoints', () => {
-    it('returns exactly 4 status points', () => {
+    it('returns exactly 5 status points', () => {
       const points = mod.getStatusPoints()
-      expect(points).toHaveLength(4)
+      expect(points).toHaveLength(5)
     })
 
     it('returns expected point definitions', () => {
       const points = mod.getStatusPoints()
-      expect(points).toEqual([
-        { id: 'reachable',   label: 'Device Reachable', defaultAlertable: true },
-        { id: 'power_on',    label: 'Power State',      defaultAlertable: true },
-        { id: 'screen_mute', label: 'Screen Mute',      defaultAlertable: false },
-        { id: 'volume_mute', label: 'Volume Mute',      defaultAlertable: false }
-      ])
+      const ids = points.map(p => p.id)
+      expect(ids).toEqual(['reachable', 'power_on', 'screen_mute', 'volume_mute', 'input_source'])
+      const inputSource = points.find(p => p.id === 'input_source')!
+      expect(inputSource.defaultAlertable).toBe(false)
+      expect(inputSource.options).toEqual(['DTV', 'AV', 'Component', 'HDMI 1', 'HDMI 2', 'HDMI 3', 'HDMI 4', 'DisplayPort'])
     })
 
     it('is synchronous and pure — same result on repeated calls', () => {

@@ -39,6 +39,13 @@ export class LightwareModule implements DeviceModule {
       { id: 'reachable', label: 'Device Reachable', defaultAlertable: true },
       { id: 'signal_locked', label: 'All Ports Signal Locked', defaultAlertable: true },
       { id: 'hardware_fault', label: 'Hardware Fault', defaultAlertable: true },
+      {
+        id: 'hdmi_input_signal',
+        label: 'HDMI Input Signal',
+        defaultAlertable: false,
+        options: ['I1', 'I2', 'I3', 'I4']
+      },
+      { id: 'usb_connected', label: 'USB Host Connected', defaultAlertable: false }
     ]
   }
 
@@ -274,13 +281,23 @@ export class LightwareModule implements DeviceModule {
       // Non-fatal
     }
 
-    // 7. Subscribe to changes
+    // 7. USB host source (best effort — not all models have USB)
+    try {
+      const usbRes = await t.send('GET /V1/MEDIA/USB/XP/H1.ConnectedSource')
+      if (usbRes.ok) state.usbHostSource = usbRes.value.trim()
+    } catch {
+      // Non-fatal: model may not have USB
+    }
+
+    // 8. Subscribe to changes
     await t.send('OPEN /MEDIA/VIDEO')
     if (isMX2) {
       await t.send('OPEN /MEDIA/XP/VIDEO')
     } else {
       await t.send('OPEN /MEDIA/VIDEO/XP')
     }
+    // Subscribe to USB changes (best effort)
+    try { await t.send('OPEN /V1/MEDIA/USB') } catch { /* non-fatal */ }
 
     // 8. Start health poll
     if (!device.pollTimer) {
@@ -347,6 +364,13 @@ export class LightwareModule implements DeviceModule {
     const xpChangePath = isMX2 ? '/MEDIA/XP/VIDEO.DestinationConnectionList' : '/MEDIA/VIDEO/XP.DestinationConnectionList'
     if (path === xpChangePath) {
       this._parseDestinationConnectionList(value, state)
+      device.lastSeen = new Date().toISOString()
+      return
+    }
+
+    // USB host connected source
+    if (path === '/V1/MEDIA/USB/XP/H1.ConnectedSource') {
+      state.usbHostSource = value.trim()
       device.lastSeen = new Date().toISOString()
     }
   }
@@ -523,6 +547,7 @@ export class LightwareModule implements DeviceModule {
         presets: state.presets,
         temperature: state.temperature,
         fanStatus: state.fanStatus,
+        usbHostSource: state.usbHostSource,
       },
     }
   }

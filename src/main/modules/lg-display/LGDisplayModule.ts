@@ -67,7 +67,13 @@ export class LGDisplayModule implements DeviceModule {
       { id: 'reachable',    label: 'Device Reachable', defaultAlertable: true },
       { id: 'power_on',     label: 'Power State',      defaultAlertable: true },
       { id: 'screen_mute',  label: 'Screen Mute',      defaultAlertable: false },
-      { id: 'volume_mute',  label: 'Volume Mute',      defaultAlertable: false }
+      { id: 'volume_mute',  label: 'Volume Mute',      defaultAlertable: false },
+      {
+        id: 'input_source',
+        label: 'Input Source',
+        defaultAlertable: false,
+        options: ['DTV', 'AV', 'Component', 'HDMI 1', 'HDMI 2', 'HDMI 3', 'HDMI 4', 'DisplayPort']
+      }
     ]
   }
 
@@ -144,6 +150,12 @@ export class LGDisplayModule implements DeviceModule {
     const device = this._devices.get(deviceId)
     if (!device) {
       return { deviceId, status: 'RED', lastSeen: null }
+    }
+
+    // On the very first ping, block until we have real data.
+    // Subsequent pings use the state cached by the internal poll timer.
+    if (!device.polled) {
+      await this._pollDevice(deviceId)
     }
 
     return {
