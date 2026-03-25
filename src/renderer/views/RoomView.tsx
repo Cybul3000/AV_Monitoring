@@ -137,17 +137,17 @@ export const RoomView: React.FC<Props> = ({ regionId, officeId, floorId, roomId 
                 </div>
               </div>
 
-              {actionResult && (
-                <div style={{
-                  marginTop: 'var(--spacing-md)', padding: 'var(--spacing-sm) var(--spacing-md)',
-                  borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-sm)',
-                  background: actionResult.ok ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)',
-                  color: actionResult.ok ? 'var(--color-green)' : 'var(--color-red)',
-                  border: `1px solid ${actionResult.ok ? 'var(--color-green)' : 'var(--color-red)'}`
-                }}>
-                  {actionResult.message}
-                </div>
-              )}
+              {/* Reserved-height feedback bar — prevents layout shift on show/hide */}
+              <div style={{
+                marginTop: 'var(--spacing-md)', padding: 'var(--spacing-sm) var(--spacing-md)',
+                borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-sm)',
+                visibility: actionResult ? 'visible' : 'hidden',
+                background: actionResult?.ok ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)',
+                color: actionResult?.ok ? 'var(--color-green)' : 'var(--color-red)',
+                border: `1px solid ${actionResult ? (actionResult.ok ? 'var(--color-green)' : 'var(--color-red)') : 'transparent'}`,
+              }}>
+                {actionResult?.message ?? '\u00A0'}
+              </div>
 
               {selectedDevice.deviceType === 'zoom-room' && (
                 <div style={{ marginTop: 'var(--spacing-lg)' }}>
@@ -184,7 +184,9 @@ export const RoomView: React.FC<Props> = ({ regionId, officeId, floorId, roomId 
                   <LGDisplayPanel
                     device={selectedDevice}
                     meta={getDeviceMeta(selectedDevice.id)}
-                    onCommand={(command, params) => void handleAction(selectedDevice.id, command, params)}
+                    onCommand={(command, params) =>
+                      (window.api as unknown as ApiShape).deviceCommand({ deviceId: selectedDevice.id, command, params })
+                    }
                   />
                 </div>
               )}

@@ -1,7 +1,6 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import type { HierarchyNode } from '@shared/ipc-types'
 
-// Input sources the UI exposes for switching
 const INPUT_OPTIONS: Array<{ label: string; code: string }> = [
   { label: 'DTV',         code: '00' },
   { label: 'AV',          code: '10' },
@@ -13,27 +12,84 @@ const INPUT_OPTIONS: Array<{ label: string; code: string }> = [
   { label: 'DisplayPort', code: '60' }
 ]
 
+interface OptimisticState {
+  power?: 'on' | 'off' | null
+  input?: string | null
+  screenMute?: boolean | null
+  volumeMute?: boolean | null
+  volume?: number | null
+}
+
 interface Props {
   device: HierarchyNode
   meta: Record<string, unknown>
-  onCommand: (command: string, params?: Record<string, unknown>) => void
+  onCommand: (command: string, params?: Record<string, unknown>) => Promise<{ success: boolean; error?: string }>
 }
 
 export const LGDisplayPanel: React.FC<Props> = ({ device: _device, meta, onCommand }) => {
   const [inputDropdownOpen, setInputDropdownOpen] = useState(false)
+  const [optimistic, setOptimistic] = useState<OptimisticState>({})
+  const [pendingCommand, setPendingCommand] = useState<string | null>(null)
+  const [feedback, setFeedback] = useState<{ message: string; ok: boolean } | null>(null)
 
-  const power       = meta.power       as 'on' | 'off' | null | undefined
-  const input       = meta.input       as string | null | undefined
-  const screenMute  = meta.screenMute  as boolean | null | undefined
-  const volumeMute  = meta.volumeMute  as boolean | null | undefined
-  const volume      = meta.volume      as number | null | undefined
-  const connected   = meta.connected   as boolean | undefined
+  // Clear optimistic state when real poll data arrives
+  useEffect(() => {
+    setOptimistic({})
+  }, [meta.power, meta.input, meta.screenMute, meta.volumeMute, meta.volume])
+
+  // Resolved values — optimistic overrides polled meta until next poll
+  const power      = (optimistic.power      !== undefined ? optimistic.power      : meta.power)      as 'on' | 'off' | null | undefined
+  const input      = (optimistic.input      !== undefined ? optimistic.input      : meta.input)      as string | null | undefined
+  const screenMute = (optimistic.screenMute !== undefined ? optimistic.screenMute : meta.screenMute) as boolean | null | undefined
+  const volumeMute = (optimistic.volumeMute !== undefined ? optimistic.volumeMute : meta.volumeMute) as boolean | null | undefined
+  const volume     = (optimistic.volume     !== undefined ? optimistic.volume     : meta.volume)     as number | null | undefined
+  const connected  = meta.connected as boolean | undefined
+
+  const handleCommand = async (command: string, params?: Record<string, unknown>) => {
+    // Apply optimistic update immediately
+    switch (command) {
+      case 'powerOn':       setOptimistic(o => ({ ...o, power: 'on' })); break
+      case 'powerOff':      setOptimistic(o => ({ ...o, power: 'off' })); break
+      case 'screenMuteOn':  setOptimistic(o => ({ ...o, screenMute: true })); break
+      case 'screenMuteOff': setOptimistic(o => ({ ...o, screenMute: false })); break
+      case 'volumeMuteOn':  setOptimistic(o => ({ ...o, volumeMute: true })); break
+      case 'volumeMuteOff': setOptimistic(o => ({ ...o, volumeMute: false })); break
+      case 'setInput': {
+        const opt = INPUT_OPTIONS.find(o => o.code === (params?.inputCode as string))
+        if (opt) setOptimistic(o => ({ ...o, input: opt.label }))
+        break
+      }
+      case 'volumeUp': {
+        const curr = (optimistic.volume !== undefined ? optimistic.volume : (meta.volume as number | null)) ?? 0
+        setOptimistic(o => ({ ...o, volume: Math.min(100, curr + 10) }))
+        break
+      }
+      case 'volumeDown': {
+        const curr = (optimistic.volume !== undefined ? optimistic.volume : (meta.volume as number | null)) ?? 0
+        setOptimistic(o => ({ ...o, volume: Math.max(0, curr - 10) }))
+        break
+      }
+    }
+
+    setPendingCommand(command)
+    try {
+      const res = await onCommand(command, params)
+      setFeedback({ message: res.success ? 'Done' : (res.error ?? 'Failed'), ok: res.success })
+      if (!res.success) setOptimistic({}) // revert on failure
+    } catch {
+      setFeedback({ message: 'Command failed', ok: false })
+      setOptimistic({})
+    } finally {
+      setPendingCommand(null)
+      setTimeout(() => setFeedback(null), 2500)
+    }
+  }
 
   // ── Badge colours ──────────────────────────────────────────────────────────
 
   const powerColor =
-    power === 'on'  ? 'var(--color-green)'  :
-    power === 'off' ? 'var(--color-red)'    :
+    power === 'on'  ? 'var(--color-green)' :
+    power === 'off' ? 'var(--color-red)'   :
     'var(--color-text-muted)'
 
   const powerLabel =
@@ -51,22 +107,11 @@ export const LGDisplayPanel: React.FC<Props> = ({ device: _device, meta, onComma
     volumeMute === false ? 'var(--color-green)' :
     'var(--color-text-muted)'
 
-  // ── Handlers ───────────────────────────────────────────────────────────────
-
-  const handleSetInput = (code: string) => {
-    onCommand('setInput', { inputCode: code })
-    setInputDropdownOpen(false)
-  }
-
-  const handleVolumeUp   = () => onCommand('volumeUp')
-  const handleVolumeDown = () => onCommand('volumeDown')
-
-  // ── Render ─────────────────────────────────────────────────────────────────
+  const busy = (cmd: string) => pendingCommand === cmd
 
   return (
     <div style={styles.root}>
 
-      {/* Connection status banner */}
       {connected === false && (
         <div style={styles.banner}>
           Device unreachable — attempting to reconnect
@@ -83,19 +128,17 @@ export const LGDisplayPanel: React.FC<Props> = ({ device: _device, meta, onComma
           <div style={styles.btnGroup}>
             <button
               style={{ ...styles.btn, ...styles.btnPrimary }}
-              onClick={() => onCommand('powerOn')}
-              disabled={power === 'on'}
-              title="Power On"
+              onClick={() => void handleCommand('powerOn')}
+              disabled={power === 'on' || pendingCommand !== null}
             >
-              On
+              {busy('powerOn') ? '…' : 'On'}
             </button>
             <button
               style={{ ...styles.btn, ...styles.btnDanger }}
-              onClick={() => onCommand('powerOff')}
-              disabled={power === 'off'}
-              title="Power Off"
+              onClick={() => void handleCommand('powerOff')}
+              disabled={power === 'off' || pendingCommand !== null}
             >
-              Off
+              {busy('powerOff') ? '…' : 'Off'}
             </button>
           </div>
         </div>
@@ -105,13 +148,12 @@ export const LGDisplayPanel: React.FC<Props> = ({ device: _device, meta, onComma
       <section style={styles.section}>
         <div style={styles.sectionHeader}>Input Source</div>
         <div style={styles.row}>
-          <span style={styles.valueLabel}>
-            {input ?? 'Unknown'}
-          </span>
+          <span style={styles.valueLabel}>{input ?? 'Unknown'}</span>
           <div style={{ position: 'relative' }}>
             <button
               style={{ ...styles.btn, ...styles.btnSecondary }}
               onClick={() => setInputDropdownOpen(o => !o)}
+              disabled={pendingCommand !== null}
             >
               Switch input
             </button>
@@ -120,11 +162,8 @@ export const LGDisplayPanel: React.FC<Props> = ({ device: _device, meta, onComma
                 {INPUT_OPTIONS.map(opt => (
                   <button
                     key={opt.code}
-                    style={{
-                      ...styles.dropdownItem,
-                      fontWeight: input === opt.label ? 600 : 400
-                    }}
-                    onClick={() => handleSetInput(opt.code)}
+                    style={{ ...styles.dropdownItem, fontWeight: input === opt.label ? 600 : 400 }}
+                    onClick={() => { void handleCommand('setInput', { inputCode: opt.code }); setInputDropdownOpen(false) }}
                   >
                     {opt.label}
                   </button>
@@ -140,24 +179,22 @@ export const LGDisplayPanel: React.FC<Props> = ({ device: _device, meta, onComma
         <div style={styles.sectionHeader}>Screen Mute</div>
         <div style={styles.row}>
           <span style={{ ...styles.badge, color: screenMuteColor, borderColor: screenMuteColor }}>
-            {screenMute === null || screenMute === undefined ? 'Unknown' : screenMute ? 'On' : 'Off'}
+            {screenMute == null ? 'Unknown' : screenMute ? 'On' : 'Off'}
           </span>
           <div style={styles.btnGroup}>
             <button
               style={{ ...styles.btn, ...styles.btnWarning }}
-              onClick={() => onCommand('screenMuteOn')}
-              disabled={screenMute === true}
-              title="Enable Screen Mute"
+              onClick={() => void handleCommand('screenMuteOn')}
+              disabled={screenMute === true || pendingCommand !== null}
             >
-              Mute On
+              {busy('screenMuteOn') ? '…' : 'Mute On'}
             </button>
             <button
               style={{ ...styles.btn, ...styles.btnSecondary }}
-              onClick={() => onCommand('screenMuteOff')}
-              disabled={screenMute === false}
-              title="Disable Screen Mute"
+              onClick={() => void handleCommand('screenMuteOff')}
+              disabled={screenMute === false || pendingCommand !== null}
             >
-              Mute Off
+              {busy('screenMuteOff') ? '…' : 'Mute Off'}
             </button>
           </div>
         </div>
@@ -168,24 +205,22 @@ export const LGDisplayPanel: React.FC<Props> = ({ device: _device, meta, onComma
         <div style={styles.sectionHeader}>Volume Mute</div>
         <div style={styles.row}>
           <span style={{ ...styles.badge, color: volumeMuteColor, borderColor: volumeMuteColor }}>
-            {volumeMute === null || volumeMute === undefined ? 'Unknown' : volumeMute ? 'On' : 'Off'}
+            {volumeMute == null ? 'Unknown' : volumeMute ? 'On' : 'Off'}
           </span>
           <div style={styles.btnGroup}>
             <button
               style={{ ...styles.btn, ...styles.btnWarning }}
-              onClick={() => onCommand('volumeMuteOn')}
-              disabled={volumeMute === true}
-              title="Enable Volume Mute"
+              onClick={() => void handleCommand('volumeMuteOn')}
+              disabled={volumeMute === true || pendingCommand !== null}
             >
-              Mute On
+              {busy('volumeMuteOn') ? '…' : 'Mute On'}
             </button>
             <button
               style={{ ...styles.btn, ...styles.btnSecondary }}
-              onClick={() => onCommand('volumeMuteOff')}
-              disabled={volumeMute === false}
-              title="Disable Volume Mute"
+              onClick={() => void handleCommand('volumeMuteOff')}
+              disabled={volumeMute === false || pendingCommand !== null}
             >
-              Mute Off
+              {busy('volumeMuteOff') ? '…' : 'Mute Off'}
             </button>
           </div>
         </div>
@@ -201,37 +236,40 @@ export const LGDisplayPanel: React.FC<Props> = ({ device: _device, meta, onComma
           <div style={styles.btnGroup}>
             <button
               style={{ ...styles.btn, ...styles.btnSecondary, minWidth: 40 }}
-              onClick={handleVolumeDown}
-              title="Volume Down 10"
+              onClick={() => void handleCommand('volumeDown')}
+              disabled={pendingCommand !== null}
             >
-              −10
+              {busy('volumeDown') ? '…' : '−10'}
             </button>
             <button
               style={{ ...styles.btn, ...styles.btnSecondary, minWidth: 40 }}
-              onClick={handleVolumeUp}
-              title="Volume Up 10"
+              onClick={() => void handleCommand('volumeUp')}
+              disabled={pendingCommand !== null}
             >
-              +10
+              {busy('volumeUp') ? '…' : '+10'}
             </button>
           </div>
         </div>
-        {/* Visual volume bar */}
         {volume !== null && volume !== undefined && (
           <div style={styles.volumeBarTrack}>
-            <div
-              style={{
-                ...styles.volumeBarFill,
-                width: `${volume}%`
-              }}
-            />
+            <div style={{ ...styles.volumeBarFill, width: `${volume}%` }} />
           </div>
         )}
       </section>
+
+      {/* ── Inline feedback — always reserved to prevent layout shift ── */}
+      <div style={{
+        ...styles.feedbackBar,
+        visibility: feedback ? 'visible' : 'hidden',
+        background: feedback?.ok ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)',
+        color: feedback?.ok ? 'var(--color-green)' : 'var(--color-red)',
+        borderColor: feedback?.ok ? 'var(--color-green)' : 'var(--color-red)',
+      }}>
+        {feedback?.message ?? '\u00A0'}
+      </div>
     </div>
   )
 }
-
-// ── Styles ─────────────────────────────────────────────────────────────────
 
 const styles = {
   root: {
@@ -250,6 +288,14 @@ const styles = {
     borderRadius: 'var(--radius-md)',
     fontSize: 'var(--font-size-sm)',
     color: 'var(--color-red)'
+  },
+  feedbackBar: {
+    padding: '6px var(--spacing-md)',
+    borderRadius: 'var(--radius-md)',
+    border: '1px solid transparent',
+    fontSize: 'var(--font-size-sm)',
+    fontWeight: 500,
+    textAlign: 'center' as const,
   },
   section: {
     padding: 'var(--spacing-sm) 0',
@@ -316,26 +362,11 @@ const styles = {
     cursor: 'pointer',
     fontWeight: 500,
     transition: 'opacity 0.1s',
-    // disabled state handled via opacity via CSS-in-JS workaround — we use
-    // the disabled attribute on the button itself for accessibility
   } as React.CSSProperties,
-  btnPrimary: {
-    background: 'var(--color-accent)',
-    color: '#fff'
-  } as React.CSSProperties,
-  btnDanger: {
-    background: 'var(--color-red)',
-    color: '#fff'
-  } as React.CSSProperties,
-  btnWarning: {
-    background: 'var(--color-amber)',
-    color: '#000'
-  } as React.CSSProperties,
-  btnSecondary: {
-    background: 'transparent',
-    color: 'var(--color-text-primary)',
-    border: '1px solid var(--color-border)'
-  } as React.CSSProperties,
+  btnPrimary:   { background: 'var(--color-accent)', color: '#fff' } as React.CSSProperties,
+  btnDanger:    { background: 'var(--color-red)',    color: '#fff' } as React.CSSProperties,
+  btnWarning:   { background: 'var(--color-amber)',  color: '#000' } as React.CSSProperties,
+  btnSecondary: { background: 'transparent', color: 'var(--color-text-primary)', border: '1px solid var(--color-border)' } as React.CSSProperties,
   dropdown: {
     position: 'absolute' as const,
     top: '100%',
