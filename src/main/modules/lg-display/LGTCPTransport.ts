@@ -73,8 +73,7 @@ export class LGTCPTransport extends EventEmitter {
     })
 
     socket.on('error', (err: Error) => {
-      if (this.verbose) console.error(`[LGTCPTransport] socket error: ${err.message}`)
-      this.emit('error', err)
+      console.warn(`[LGTCPTransport] socket error: ${err.message}`)
       // Reject any in-flight command
       if (this._pending) {
         clearTimeout(this._pending.timer)
