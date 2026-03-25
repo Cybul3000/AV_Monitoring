@@ -159,7 +159,7 @@ const api = {
     ipcRenderer.invoke('device:checkHost', { host }),
 
   // ── Registry ──────────────────────────────────────────────────────────────
-  registryList: (): Promise<{ success: boolean; entries?: Array<{ type: string; label: string; configFields: unknown[]; moduleAvailable: boolean }>; error?: string }> =>
+  registryList: (): Promise<{ success: boolean; entries?: Array<{ type: string; label: string; port: number | null; configFields: unknown[]; moduleAvailable: boolean }>; error?: string }> =>
     ipcRenderer.invoke('registry:list'),
 
   // ── Dialogs ───────────────────────────────────────────────────────────────

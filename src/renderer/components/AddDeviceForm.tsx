@@ -4,6 +4,7 @@ interface DeviceTypeField {
   key: string
   label: string
   placeholder?: string
+  hint?: string
   type?: 'text' | 'number' | 'password'
   required?: boolean
   secret?: boolean
@@ -12,6 +13,7 @@ interface DeviceTypeField {
 interface DeviceTypeEntry {
   type: string
   label: string
+  port: number | null
   configFields: DeviceTypeField[]
   moduleAvailable: boolean
 }
@@ -56,12 +58,12 @@ export const AddDeviceForm: React.FC<Props> = ({ onAdd, onCancel }) => {
       } catch {
         // fallback: hard-coded types list
         const fallback: DeviceTypeEntry[] = [
-          { type: 'zoom-room', label: 'Zoom Room', configFields: [], moduleAvailable: true },
-          { type: 'lg-display', label: 'LG Pro Display', configFields: [], moduleAvailable: true },
-          { type: 'lightware-matrix', label: 'Lightware Matrix', configFields: [], moduleAvailable: true },
-          { type: 'biamp-tesira', label: 'Biamp Tesira', configFields: [], moduleAvailable: true },
-          { type: 'crestron-ssh', label: 'Crestron SSH', configFields: [], moduleAvailable: false },
-          { type: 'dante-audio', label: 'Dante Audio', configFields: [], moduleAvailable: false }
+          { type: 'zoom-room', label: 'Zoom Room', port: null, configFields: [], moduleAvailable: true },
+          { type: 'lg-display', label: 'LG Pro Display', port: 9761, configFields: [], moduleAvailable: true },
+          { type: 'lightware-matrix', label: 'Lightware Matrix', port: 6107, configFields: [], moduleAvailable: true },
+          { type: 'biamp-tesira', label: 'Biamp Tesira', port: 23, configFields: [], moduleAvailable: true },
+          { type: 'crestron-ssh', label: 'Crestron SSH', port: 22, configFields: [], moduleAvailable: false },
+          { type: 'dante-network-audio', label: 'Dante Network Audio', port: null, configFields: [], moduleAvailable: true }
         ]
         setDeviceTypes(fallback)
         setSelectedType('zoom-room')
@@ -72,9 +74,16 @@ export const AddDeviceForm: React.FC<Props> = ({ onAdd, onCancel }) => {
 
   const selected = deviceTypes.find(dt => dt.type === selectedType)
 
+  // If registry provides a 'host' configField, use it instead of the generic host input
+  const hostFromConfig = selected?.configFields.some(f => f.key === 'host') ?? false
+  // Show port field only when the registry defines a default port (not null)
+  const showPort = selected != null && selected.port !== null
+  // Effective host value: from configFields state or dedicated host state
+  const effectiveHost = hostFromConfig ? (fields['host'] ?? '') : host.trim()
+
   const handleHostBlur = async () => {
-    const trimmed = host.trim()
-    if (!trimmed) { setDuplicateWarning(null); return }
+    const trimmed = effectiveHost.trim()
+    if (!trimmed || hostFromConfig) { setDuplicateWarning(null); return }
     try {
       const api = window.api as unknown as ApiShape
       const res = await api.deviceCheckHost(trimmed)
@@ -88,16 +97,19 @@ export const AddDeviceForm: React.FC<Props> = ({ onAdd, onCancel }) => {
     }
   }
 
+  // Host is required only when the device needs one (not optional like Dante)
+  const hostRequired = !hostFromConfig
+  const canSubmit = name.trim() && (hostFromConfig || host.trim()) && selectedType && selected?.moduleAvailable && !submitting
+
   const handleSubmit = async () => {
-    if (!name.trim() || !host.trim() || !selectedType) return
-    if (!selected?.moduleAvailable) return
+    if (!canSubmit) return
 
     setSubmitting(true)
     try {
       const secretFields: Record<string, string> = {}
       const configFields: Record<string, unknown> = {}
 
-      selected.configFields.forEach(f => {
+      selected!.configFields.forEach(f => {
         const val = fields[f.key] ?? ''
         if (f.secret) {
           secretFields[f.key] = val
@@ -109,7 +121,7 @@ export const AddDeviceForm: React.FC<Props> = ({ onAdd, onCancel }) => {
       await onAdd({
         name: name.trim(),
         deviceType: selectedType,
-        host: host.trim(),
+        host: hostFromConfig ? (fields['host'] ?? '') : host.trim(),
         port: port ? parseInt(port, 10) : undefined,
         credentials: Object.keys(secretFields).length ? secretFields : undefined,
         config: Object.keys(configFields).length ? configFields : undefined
@@ -151,48 +163,56 @@ export const AddDeviceForm: React.FC<Props> = ({ onAdd, onCancel }) => {
         onChange={e => setName(e.target.value)}
       />
 
-      <label style={styles.label}>Host / IP Address</label>
-      <input
-        style={styles.input}
-        placeholder="e.g., 10.0.6.100"
-        value={host}
-        onChange={e => setHost(e.target.value)}
-        onBlur={() => void handleHostBlur()}
-      />
-      {duplicateWarning && (
-        <div style={styles.warning}>Warning: {duplicateWarning}</div>
+      {!hostFromConfig && (
+        <>
+          <label style={styles.label}>Host / IP Address{hostRequired && ' *'}</label>
+          <input
+            style={styles.input}
+            placeholder="e.g., 10.0.6.100"
+            value={host}
+            onChange={e => setHost(e.target.value)}
+            onBlur={() => void handleHostBlur()}
+          />
+          {duplicateWarning && (
+            <div style={styles.warning}>Warning: {duplicateWarning}</div>
+          )}
+        </>
       )}
 
-      <label style={styles.label}>Port (optional)</label>
-      <input
-        style={styles.input}
-        placeholder="Leave blank for default"
-        type="number"
-        value={port}
-        onChange={e => setPort(e.target.value)}
-      />
+      {showPort && (
+        <>
+          <label style={styles.label}>Port (optional)</label>
+          <input
+            style={styles.input}
+            placeholder="Leave blank for default"
+            type="number"
+            value={port}
+            onChange={e => setPort(e.target.value)}
+          />
+        </>
+      )}
 
       {selected?.configFields.map(f => (
         <div key={f.key}>
           <label style={styles.label}>{f.label}{f.required && ' *'}</label>
           <input
             style={styles.input}
-            placeholder={f.placeholder ?? f.label}
+            placeholder={f.placeholder ?? f.hint ?? f.label}
             type={f.type === 'password' || f.secret ? 'password' : f.type ?? 'text'}
             value={fields[f.key] ?? ''}
             onChange={e => setFields(prev => ({ ...prev, [f.key]: e.target.value }))}
           />
+          {f.hint && (
+            <div style={styles.hint}>{f.hint}</div>
+          )}
         </div>
       ))}
 
       <div style={{ display: 'flex', gap: 'var(--spacing-sm)', justifyContent: 'flex-end', marginTop: 'var(--spacing-md)' }}>
         <button style={styles.cancelBtn} onClick={onCancel}>Cancel</button>
         <button
-          style={{
-            ...styles.confirmBtn,
-            opacity: (!name.trim() || !host.trim() || !selected?.moduleAvailable || submitting) ? 0.5 : 1
-          }}
-          disabled={!name.trim() || !host.trim() || !selected?.moduleAvailable || submitting}
+          style={{ ...styles.confirmBtn, opacity: canSubmit ? 1 : 0.5 }}
+          disabled={!canSubmit}
           onClick={() => void handleSubmit()}
         >
           {submitting ? 'Adding…' : 'Add Device'}
@@ -228,6 +248,10 @@ const styles = {
   warning: {
     fontSize: 'var(--font-size-xs)', color: 'var(--color-amber)',
     marginTop: '2px', marginBottom: 'var(--spacing-xs)'
+  },
+  hint: {
+    fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)',
+    marginTop: '3px', marginBottom: 'var(--spacing-xs)'
   },
   cancelBtn: {
     padding: '6px 14px', background: 'transparent', color: 'var(--color-text-secondary)',
