@@ -2,6 +2,7 @@ import { ipcMain, dialog } from 'electron'
 import { randomUUID } from 'crypto'
 import { getDb } from '../db/database'
 import { onDeviceCreated } from '../modules/index'
+import { connectDevice, disconnectDevice, scheduleDevice, unscheduleDevice } from './device-handlers'
 import type {
   HierarchyNode,
   HierarchyResponse,
@@ -21,6 +22,17 @@ export function registerHierarchyHandlers(): void {
       filters: options?.filters ?? [{ name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'svg'] }]
     })
     return result.canceled ? null : result.filePaths[0]
+  })
+
+  ipcMain.handle('device:checkHost', (_event, { host }: { host: string }) => {
+    if (!host) return { exists: false, device: null }
+    const db = getDb()
+    const existing = db
+      .prepare(
+        `SELECT d.id, d.name, r.name as roomName FROM devices d JOIN rooms r ON r.id = d.room_id WHERE d.host = ?`
+      )
+      .get(host) as { id: string; name: string; roomName: string } | undefined
+    return { exists: !!existing, device: existing ?? null }
   })
 
   ipcMain.handle(
@@ -155,12 +167,12 @@ function handleUpdate(req: HierarchyUpdateRequest): HierarchyUpdateResponse {
       }
       case 'device': {
         const d = req.data ?? {}
-        // Check for duplicate IP in the same room
+        // Check for duplicate IP across all rooms
         const duplicate = db
-          .prepare(`SELECT id FROM devices WHERE room_id = ? AND host = ?`)
-          .get(req.parentId, d.host)
+          .prepare(`SELECT d.id, d.name, r.name as room_name FROM devices d JOIN rooms r ON r.id = d.room_id WHERE d.host = ?`)
+          .get(d.host) as { id: string; name: string; room_name: string } | undefined
         if (duplicate) {
-          return { success: false, error: `A device with host ${d.host} already exists in this room` }
+          return { success: false, error: `Host ${d.host} is already used by "${duplicate.name}" in ${duplicate.room_name}` }
         }
         db.prepare(
           `INSERT INTO devices (id, room_id, device_type, name, host, port, web_ui_url, poll_interval, map_x, map_y, created_at, updated_at)
@@ -181,6 +193,9 @@ function handleUpdate(req: HierarchyUpdateRequest): HierarchyUpdateResponse {
         )
         // Seed default alert rules for the newly created device type
         onDeviceCreated(d.deviceType as string)
+        // Connect the module and start polling for the new device
+        void connectDevice(id, d.deviceType as string, d.host as string, (d.port as number | undefined) ?? null)
+        scheduleDevice(id, d.deviceType as string, (d.pollInterval as number | undefined) ?? 30000)
         return { success: true, id }
       }
     }
@@ -257,9 +272,15 @@ function handleUpdate(req: HierarchyUpdateRequest): HierarchyUpdateResponse {
       case 'room':
         db.prepare('DELETE FROM rooms WHERE id = ?').run(req.id)
         break
-      case 'device':
+      case 'device': {
+        const devRow = db.prepare('SELECT device_type FROM devices WHERE id = ?').get(req.id) as { device_type: string } | undefined
         db.prepare('DELETE FROM devices WHERE id = ?').run(req.id)
+        if (devRow) {
+          unscheduleDevice(req.id)
+          void disconnectDevice(req.id, devRow.device_type)
+        }
         break
+      }
     }
     return { success: true }
   }

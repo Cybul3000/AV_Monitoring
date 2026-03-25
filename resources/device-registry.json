@@ -24,16 +24,6 @@
       ]
     },
     {
-      "type": "dante-audio",
-      "label": "Dante Network Audio Device",
-      "module": "DanteModule",
-      "protocol": "mDNS/UDP",
-      "port": null,
-      "configFields": [
-        { "key": "deviceName", "label": "Dante Device Name (mDNS)", "secret": false }
-      ]
-    },
-    {
       "type": "crestron-ssh",
       "label": "Crestron Series 3/4 (SSH)",
       "module": "CrestronSSHModule",

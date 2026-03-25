@@ -2,27 +2,29 @@ import { test, expect, _electron as electron } from '@playwright/test'
 import path from 'path'
 import os from 'os'
 import fs from 'fs'
-import Database from 'better-sqlite3'
+import { execSync } from 'child_process'
 
 const MIGRATION_PATH = path.resolve(__dirname, '../../src/main/db/migrations/001_initial.sql')
-const APP_ENTRY = path.resolve(__dirname, '../../dist/main/index.js')
+const APP_ENTRY = path.resolve(__dirname, '../../dist-electron/main/index.js')
 const FIXTURE_PNG = path.resolve(__dirname, '../fixtures/floor-plan.png')
 
 function seedFloorMapDb(dbPath: string, mapPath?: string) {
-  const db = new Database(dbPath)
-  db.pragma('journal_mode = WAL')
-  db.pragma('foreign_keys = ON')
-  db.exec(fs.readFileSync(MIGRATION_PATH, 'utf-8'))
-
-  db.prepare("INSERT INTO regions (id, name) VALUES ('r1', 'EMEA')").run()
-  db.prepare("INSERT INTO offices (id, region_id, name, city) VALUES ('o1', 'r1', 'London HQ', 'London')").run()
-  db.prepare(`INSERT INTO floors (id, office_id, name, level, floor_map_path) VALUES ('f1', 'o1', 'Ground Floor', 1, ?)`)
-    .run(mapPath ?? null)
-  db.prepare("INSERT INTO rooms (id, floor_id, name, map_x, map_y, map_w, map_h) VALUES ('rm1', 'f1', 'Boardroom', 10, 10, 30, 20)").run()
-  db.prepare("INSERT INTO rooms (id, floor_id, name, map_x, map_y, map_w, map_h) VALUES ('rm2', 'f1', 'Huddle Room', 50, 10, 30, 20)").run()
-  db.prepare("INSERT INTO devices (id, room_id, name, device_type, host, status) VALUES ('d1', 'rm1', 'Zoom 1', 'zoom-room', '10.0.0.1', 'GREEN')").run()
-  db.prepare("INSERT INTO devices (id, room_id, name, device_type, host, status) VALUES ('d2', 'rm2', 'Zoom 2', 'zoom-room', '10.0.0.2', 'AMBER')").run()
-  db.close()
+  const migrationSql = fs.readFileSync(MIGRATION_PATH, 'utf-8')
+  const escapedMapPath = mapPath ? mapPath.replace(/'/g, "''") : ''
+  const floorMapValue = mapPath ? `'${escapedMapPath}'` : 'NULL'
+  const seedSql = `
+INSERT INTO regions (id, name) VALUES ('r1', 'EMEA');
+INSERT INTO offices (id, region_id, name, city) VALUES ('o1', 'r1', 'London HQ', 'London');
+INSERT INTO floors (id, office_id, name, level, floor_map_path) VALUES ('f1', 'o1', 'Ground Floor', 1, ${floorMapValue});
+INSERT INTO rooms (id, floor_id, name, map_x, map_y, map_w, map_h) VALUES ('rm1', 'f1', 'Boardroom', 10, 10, 30, 20);
+INSERT INTO rooms (id, floor_id, name, map_x, map_y, map_w, map_h) VALUES ('rm2', 'f1', 'Huddle Room', 50, 10, 30, 20);
+INSERT INTO devices (id, room_id, name, device_type, host, status) VALUES ('d1', 'rm1', 'Zoom 1', 'zoom-room', '10.0.0.1', 'GREEN');
+INSERT INTO devices (id, room_id, name, device_type, host, status) VALUES ('d2', 'rm2', 'Zoom 2', 'zoom-room', '10.0.0.2', 'AMBER');
+`
+  const sqlFile = dbPath + '.seed.sql'
+  fs.writeFileSync(sqlFile, migrationSql + '\n' + seedSql)
+  execSync(`sqlite3 "${dbPath}" < "${sqlFile}"`)
+  fs.unlinkSync(sqlFile)
 }
 
 function createFixturePng(): string {
@@ -65,7 +67,7 @@ test.describe('Floor map view', () => {
 
     const app = await electron.launch({
       args: [APP_ENTRY],
-      env: { ...process.env, AV_MON_DB_PATH: dbPath }
+      env: { ...process.env, AV_MON_DB_PATH: dbDir }
     })
 
     try {
@@ -93,7 +95,7 @@ test.describe('Floor map view', () => {
 
     const app = await electron.launch({
       args: [APP_ENTRY],
-      env: { ...process.env, AV_MON_DB_PATH: dbPath }
+      env: { ...process.env, AV_MON_DB_PATH: dbDir }
     })
 
     try {
@@ -130,7 +132,7 @@ test.describe('Floor map view', () => {
 
     const app = await electron.launch({
       args: [APP_ENTRY],
-      env: { ...process.env, AV_MON_DB_PATH: noMapDbPath }
+      env: { ...process.env, AV_MON_DB_PATH: noMapDbDir }
     })
 
     try {

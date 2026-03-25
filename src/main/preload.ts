@@ -154,6 +154,10 @@ const api = {
   alertSetRule: (req: AlertRuleSetRequest): Promise<{ success: boolean; error?: string }> =>
     ipcRenderer.invoke('alert:setRule', req),
 
+  // ── Device host check ─────────────────────────────────────────────────────
+  deviceCheckHost: (host: string): Promise<{ exists: boolean; device: { id: string; name: string; roomName: string } | null }> =>
+    ipcRenderer.invoke('device:checkHost', { host }),
+
   // ── Registry ──────────────────────────────────────────────────────────────
   registryList: (): Promise<{ success: boolean; entries?: Array<{ type: string; label: string; configFields: unknown[]; moduleAvailable: boolean }>; error?: string }> =>
     ipcRenderer.invoke('registry:list'),

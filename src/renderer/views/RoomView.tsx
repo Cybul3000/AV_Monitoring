@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { LEDIndicator } from '../components/LEDIndicator'
 import { ConfirmActionDialog } from '../components/ConfirmActionDialog'
 import { ConfigPanel } from '../components/ConfigPanel'
+import { AddDeviceForm } from '../components/AddDeviceForm'
 import { LGDisplayPanel } from '../components/DeviceDetail/LGDisplayPanel/LGDisplayPanel'
 import { LightwarePanel } from '../components/DeviceDetail/LightwarePanel/LightwarePanel'
 import { BiampTesiraPanel } from '../components/DeviceDetail/BiampTesiraPanel/BiampTesiraPanel'
@@ -27,9 +28,9 @@ export const RoomView: React.FC<Props> = ({ regionId, officeId, floorId, roomId 
   const { roots, update } = useHierarchy()
   const { getDeviceStatus, getDeviceMeta } = useDeviceStatus()
   const [pendingAction, setPendingAction] = useState<{ deviceId: string; command: string; label: string; params?: Record<string, unknown> } | null>(null)
+  const [pendingDelete, setPendingDelete] = useState<{ deviceId: string; deviceName: string } | null>(null)
   const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(null)
   const [showAddDevice, setShowAddDevice] = useState(false)
-  const [deviceForm, setDeviceForm] = useState({ name: '', deviceType: '', host: '', port: '' })
   const [actionResult, setActionResult] = useState<{ message: string; ok: boolean } | null>(null)
   const [speakerTestResult, setSpeakerTestResult] = useState<{ message: string; ok: boolean } | null>(null)
 
@@ -64,16 +65,11 @@ export const RoomView: React.FC<Props> = ({ regionId, officeId, floorId, roomId 
     setTimeout(() => setSpeakerTestResult(null), 5000)
   }
 
-  const handleAddDevice = async () => {
-    if (!deviceForm.name || !deviceForm.deviceType || !deviceForm.host) return
+  const handleAddDevice = async (data: { name: string; deviceType: string; host: string; port?: number; credentials?: Record<string, string>; config?: Record<string, unknown> }) => {
     await update({
       action: 'create', type: 'device', parentId: roomId,
-      data: {
-        name: deviceForm.name, deviceType: deviceForm.deviceType,
-        host: deviceForm.host, port: deviceForm.port ? parseInt(deviceForm.port, 10) : undefined
-      }
+      data: { name: data.name, deviceType: data.deviceType, host: data.host, port: data.port }
     })
-    setDeviceForm({ name: '', deviceType: '', host: '', port: '' })
     setShowAddDevice(false)
   }
 
@@ -98,6 +94,7 @@ export const RoomView: React.FC<Props> = ({ regionId, officeId, floorId, roomId 
                 status={getDeviceStatus(device.id)}
                 selected={device.id === selectedDeviceId}
                 onClick={() => setSelectedDeviceId(device.id === selectedDeviceId ? null : device.id)}
+                onDelete={() => setPendingDelete({ deviceId: device.id, deviceName: device.name })}
               />
             ))}
           </div>
@@ -247,23 +244,29 @@ export const RoomView: React.FC<Props> = ({ regionId, officeId, floorId, roomId 
         />
       )}
 
+      {pendingDelete && (
+        <ConfirmActionDialog
+          title="Remove Device"
+          message={`Remove "${pendingDelete.deviceName}" from this room? This cannot be undone.`}
+          confirmLabel="Remove"
+          danger
+          onConfirm={async () => {
+            await update({ action: 'delete', type: 'device', id: pendingDelete.deviceId })
+            if (selectedDeviceId === pendingDelete.deviceId) setSelectedDeviceId(null)
+            setPendingDelete(null)
+          }}
+          onCancel={() => setPendingDelete(null)}
+        />
+      )}
+
       {showAddDevice && (
         <div style={styles.overlay} onClick={() => setShowAddDevice(false)}>
           <div style={styles.modal} onClick={e => e.stopPropagation()}>
-            <h3 style={{ marginBottom: 'var(--spacing-md)' }}>Add Device</h3>
-            <input autoFocus style={styles.input} placeholder="Device name" value={deviceForm.name}
-              onChange={e => setDeviceForm(f => ({ ...f, name: e.target.value }))} />
-            <input style={styles.input} placeholder="Device type (e.g., zoom-room)" value={deviceForm.deviceType}
-              onChange={e => setDeviceForm(f => ({ ...f, deviceType: e.target.value }))} />
-            <input style={styles.input} placeholder="Host / IP address" value={deviceForm.host}
-              onChange={e => setDeviceForm(f => ({ ...f, host: e.target.value }))} />
-            <input style={styles.input} placeholder="Port (optional)" type="number" value={deviceForm.port}
-              onChange={e => setDeviceForm(f => ({ ...f, port: e.target.value }))}
-              onKeyDown={e => { if (e.key === 'Enter') void handleAddDevice() }} />
-            <div style={{ display: 'flex', gap: 'var(--spacing-sm)', justifyContent: 'flex-end' }}>
-              <button style={styles.cancelBtn} onClick={() => setShowAddDevice(false)}>Cancel</button>
-              <button style={styles.confirmBtn} onClick={() => void handleAddDevice()}>Add</button>
-            </div>
+            <AddDeviceForm
+              roomId={roomId}
+              onAdd={handleAddDevice}
+              onCancel={() => setShowAddDevice(false)}
+            />
           </div>
         </div>
       )}
@@ -276,24 +279,44 @@ const DeviceRow: React.FC<{
   status: string
   selected: boolean
   onClick: () => void
-}> = ({ device, status, selected, onClick }) => (
-  <button
-    onClick={onClick}
+  onDelete: () => void
+}> = ({ device, status, selected, onClick, onDelete }) => (
+  <div
     style={{
-      display: 'flex', alignItems: 'center', gap: 'var(--spacing-md)',
-      padding: 'var(--spacing-md)', background: selected ? 'var(--color-bg-elevated)' : 'var(--color-bg-surface)',
+      display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)',
       border: `1px solid ${selected ? 'var(--color-accent)' : 'var(--color-border)'}`,
-      borderRadius: 'var(--radius-md)', cursor: 'pointer', textAlign: 'left' as const, width: '100%'
+      borderRadius: 'var(--radius-md)', background: selected ? 'var(--color-bg-elevated)' : 'var(--color-bg-surface)',
+      overflow: 'hidden'
     }}
   >
-    <LEDIndicator status={status as 'GREEN' | 'AMBER' | 'RED' | 'GREY'} size="md" />
-    <div style={{ flex: 1 }}>
-      <div style={{ fontWeight: 600 }}>{device.name}</div>
-      <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)' }}>
-        {device.deviceType} · {device.host}
+    <button
+      onClick={onClick}
+      style={{
+        display: 'flex', alignItems: 'center', gap: 'var(--spacing-md)',
+        padding: 'var(--spacing-md)', background: 'none', border: 'none',
+        cursor: 'pointer', textAlign: 'left' as const, flex: 1
+      }}
+    >
+      <LEDIndicator status={status as 'GREEN' | 'AMBER' | 'RED' | 'GREY'} size="md" />
+      <div style={{ flex: 1 }}>
+        <div style={{ fontWeight: 600 }}>{device.name}</div>
+        <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)' }}>
+          {device.deviceType} · {device.host}
+        </div>
       </div>
-    </div>
-  </button>
+    </button>
+    <button
+      onClick={e => { e.stopPropagation(); onDelete() }}
+      title="Remove device"
+      style={{
+        padding: '4px 8px', marginRight: 'var(--spacing-xs)', background: 'none',
+        border: 'none', color: 'var(--color-text-muted)', cursor: 'pointer',
+        fontSize: '1rem', lineHeight: 1, borderRadius: 'var(--radius-sm)'
+      }}
+    >
+      ×
+    </button>
+  </div>
 )
 
 const styles = {

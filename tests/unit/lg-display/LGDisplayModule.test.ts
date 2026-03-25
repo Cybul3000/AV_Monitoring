@@ -155,21 +155,21 @@ describe('LGDisplayModule', () => {
 
   describe('ping', () => {
     it('returns GREEN when connected and power=on', async () => {
-      mockTransportInstance.send.mockResolvedValue(makeOkSend('01'))
+      // Use command-specific mock so both the fire-and-forget poll and
+      // the timed poll return consistent values regardless of call order
+      mockTransportInstance.send.mockImplementation((cmd: string) => {
+        const vals: Record<string, string> = { ka: '01', xb: '40', kd: '00', ke: '00', kf: '32' }
+        const v = vals[cmd] ?? '01'
+        return Promise.resolve({ ok: true, value: v, rawValue: `a 0 OK${v}x` })
+      })
       await mod.connect(DEVICE_ID, makeDefaultConfig())
 
-      // Reset and set up poll returning power=on
-      mockTransportInstance.send.mockClear()
-      mockFullPollConnectedPowerOn()
-
-      // Simulate transport being connected
-      mockTransportInstance.isConnected = true
-
-      // Manually trigger the 'connected' callback that was registered
       const connectedCb = mockTransportInstance.on.mock.calls.find(
         (c: [string, unknown]) => c[0] === 'connected'
       )?.[1] as (() => void) | undefined
       connectedCb?.()
+
+      await vi.advanceTimersByTimeAsync(60_000)
 
       const status = await mod.ping(DEVICE_ID)
       expect(status.status).toBe('GREEN')
@@ -177,17 +177,19 @@ describe('LGDisplayModule', () => {
     })
 
     it('returns AMBER when power=off', async () => {
-      mockTransportInstance.send.mockResolvedValue(makeOkSend('01'))
+      mockTransportInstance.send.mockImplementation((cmd: string) => {
+        const vals: Record<string, string> = { ka: '00', xb: '40', kd: '00', ke: '00', kf: '32' }
+        const v = vals[cmd] ?? '00'
+        return Promise.resolve({ ok: true, value: v, rawValue: `a 0 OK${v}x` })
+      })
       await mod.connect(DEVICE_ID, makeDefaultConfig())
 
-      mockTransportInstance.send.mockClear()
-      mockFullPollConnectedPowerOff()
-
-      // Trigger connected
       const connectedCb = mockTransportInstance.on.mock.calls.find(
         (c: [string, unknown]) => c[0] === 'connected'
       )?.[1] as (() => void) | undefined
       connectedCb?.()
+
+      await vi.advanceTimersByTimeAsync(60_000)
 
       const status = await mod.ping(DEVICE_ID)
       expect(status.status).toBe('AMBER')
@@ -312,24 +314,15 @@ describe('LGDisplayModule', () => {
     })
 
     it('volumeUp increments volume by 10 (clamped at 100)', async () => {
-      // Set up send to return a specific volume (95 = 0x5F) during the poll,
-      // then a success response for the volumeUp command itself.
-      // We use mockResolvedValue as the persistent default so both the initial
-      // connect poll and the explicit ping poll return consistent values.
-      // The volume field (5th poll call = kf) will be overridden below.
-
-      // Step 1: do a targeted ping that sets volume to 95
-      // Use a repeating default that returns 0x01 for everything,
-      // then override the volume-specific call with 0x5F.
+      // Set up volume=95 (0x5F) via the timed poll, then volumeUp should send 0x64
       mockTransportInstance.send.mockImplementation((cmd: string, _data: string) => {
         if (cmd === 'kf') {
           return Promise.resolve({ ok: true, value: '5f', rawValue: 'f 0 OK5fx' })
         }
         return Promise.resolve({ ok: true, value: '01', rawValue: 'a 0 OK01x' })
       })
-      await mod.ping(DEVICE_ID)
+      await vi.advanceTimersByTimeAsync(60_000)
 
-      // Step 2: now volumeUp should send kf with value 0x64 (95 + 10 = 100, clamped)
       mockTransportInstance.send.mockResolvedValue(makeOkSend('64'))
       const result = await mod.sendCommand(DEVICE_ID, 'volumeUp')
       expect(result.success).toBe(true)
@@ -337,14 +330,14 @@ describe('LGDisplayModule', () => {
     })
 
     it('volumeDown decrements volume by 10 (clamped at 0)', async () => {
-      // Set volume to 5 via ping, then volumeDown should send 0x00 (5 - 10 clamped to 0)
+      // Set volume=5 (0x05) via the timed poll, then volumeDown should send 0x00
       mockTransportInstance.send.mockImplementation((cmd: string, _data: string) => {
         if (cmd === 'kf') {
           return Promise.resolve({ ok: true, value: '05', rawValue: 'f 0 OK05x' })
         }
         return Promise.resolve({ ok: true, value: '01', rawValue: 'a 0 OK01x' })
       })
-      await mod.ping(DEVICE_ID)
+      await vi.advanceTimersByTimeAsync(60_000)
 
       mockTransportInstance.send.mockResolvedValue(makeOkSend('00'))
       const result = await mod.sendCommand(DEVICE_ID, 'volumeDown')

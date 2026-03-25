@@ -58,13 +58,16 @@ export function registerDeviceHandlers(win: BrowserWindow): void {
 export function startPolling(win: BrowserWindow): void {
   _win = win
   const db = getDb()
-  const devices = db.prepare('SELECT id, device_type, poll_interval FROM devices').all() as Array<{
+  const devices = db.prepare('SELECT id, device_type, host, port, poll_interval FROM devices').all() as Array<{
     id: string
     device_type: string
+    host: string
+    port: number | null
     poll_interval: number
   }>
 
   for (const device of devices) {
+    void connectDevice(device.id, device.device_type, device.host, device.port)
     scheduleDevice(device.id, device.device_type, device.poll_interval)
   }
 }
@@ -92,6 +95,34 @@ export function unscheduleDevice(deviceId: string): void {
   if (timer) {
     clearInterval(timer)
     _timers.delete(deviceId)
+  }
+}
+
+export async function connectDevice(
+  deviceId: string,
+  deviceType: string,
+  host: string,
+  port: number | null
+): Promise<void> {
+  const module = getModule(deviceType)
+  if (!module) return
+  console.log(`[device-handlers] connecting ${deviceType} ${deviceId} → ${host}:${port ?? 'default'}`)
+  try {
+    await module.connect(deviceId, { host, port: port ?? undefined })
+    console.log(`[device-handlers] connected ${deviceId}`)
+  } catch (err) {
+    console.warn(`[device-handlers] connect failed for ${deviceId} (${deviceType}): ${err}`)
+    // Non-fatal — modules with persistent transports (LG, Lightware, Biamp) will auto-reconnect
+  }
+}
+
+export async function disconnectDevice(deviceId: string, deviceType: string): Promise<void> {
+  const module = getModule(deviceType)
+  if (!module) return
+  try {
+    await module.disconnect(deviceId)
+  } catch (err) {
+    console.warn(`[device-handlers] disconnect failed for ${deviceId}: ${err}`)
   }
 }
 

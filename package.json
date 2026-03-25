@@ -14,6 +14,7 @@
     "test": "npm run rebuild:node && vitest run",
     "test:watch": "npm run rebuild:node && vitest",
     "test:coverage": "npm run rebuild:node && vitest run --coverage",
+    "e2e": "npm run rebuild:native && npx playwright test --config=tests/e2e/playwright.config.ts",
     "test:e2e": "playwright test",
     "lint": "eslint . --ext .ts,.tsx",
     "lint:fix": "eslint . --ext .ts,.tsx --fix",

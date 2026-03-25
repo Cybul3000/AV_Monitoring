@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { Breadcrumb } from './components/Breadcrumb'
 import { NetworkBadge } from './components/NetworkBadge'
 import { GlobalDashboard } from './views/GlobalDashboard'
@@ -42,6 +42,10 @@ export const App: React.FC = () => {
   const [stack, setStack] = useState<NavEntry[]>([{ type: 'dashboard' }])
   const [activeTab, setActiveTab] = useState<ViewType>('dashboard')
 
+  // Preserves the last hierarchy position so Dashboard tab returns to where the
+  // user was (region / office / floor / room) rather than resetting to global view.
+  const hierarchyStackRef = useRef<NavEntry[]>([{ type: 'dashboard' }])
+
   const current = stack[stack.length - 1]
 
   // Restore last hierarchy path from preferences
@@ -55,6 +59,7 @@ export const App: React.FC = () => {
             const saved = JSON.parse(res.value) as NavEntry[]
             if (Array.isArray(saved) && saved.length > 0) {
               setStack(saved)
+              hierarchyStackRef.current = saved
               setActiveTab(saved[saved.length - 1].type)
             }
           } catch {
@@ -103,6 +108,7 @@ export const App: React.FC = () => {
       }
 
       const newStack = [...prev, next]
+      hierarchyStackRef.current = newStack
       persistPath(newStack)
       setActiveTab(next.type)
       return newStack
@@ -113,6 +119,7 @@ export const App: React.FC = () => {
     setStack(prev => {
       if (prev.length <= 1) return prev
       const newStack = prev.slice(0, -1)
+      hierarchyStackRef.current = newStack
       persistPath(newStack)
       setActiveTab(newStack[newStack.length - 1].type)
       return newStack
@@ -122,6 +129,7 @@ export const App: React.FC = () => {
   const navigateToIndex = useCallback((index: number) => {
     setStack(prev => {
       const newStack = prev.slice(0, index + 1)
+      hierarchyStackRef.current = newStack
       persistPath(newStack)
       setActiveTab(newStack[newStack.length - 1].type)
       return newStack
@@ -129,11 +137,16 @@ export const App: React.FC = () => {
   }, [persistPath])
 
   const handleTabClick = (tab: ViewType) => {
-    if (['dashboard', 'config', 'logs', 'observability', 'alert-settings', 'settings'].includes(tab)) {
+    if (tab === 'dashboard') {
+      // Restore last hierarchy position rather than resetting to global view
+      const restored = hierarchyStackRef.current
+      setStack(restored)
+      setActiveTab(restored[restored.length - 1].type)
+    } else if (['config', 'logs', 'observability', 'alert-settings', 'settings'].includes(tab)) {
+      // Save hierarchy position before leaving, then switch to the non-hierarchy tab
       const newStack: NavEntry[] = [{ type: tab }]
       setStack(newStack)
       setActiveTab(tab)
-      persistPath(newStack)
     }
   }
 
