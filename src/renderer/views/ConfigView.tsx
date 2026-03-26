@@ -112,7 +112,8 @@ export const ConfigView: React.FC<Props> = ({ onNavigate }) => {
       action: 'create', type: 'device', parentId: addingToRoom.roomId,
       data: {
         name: data.name, deviceType: data.deviceType,
-        host: data.host, port: data.port
+        host: data.host, port: data.port,
+        config: data.config
       }
     })
     setAddingToRoom(null)

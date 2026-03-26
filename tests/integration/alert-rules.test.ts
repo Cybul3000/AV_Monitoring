@@ -24,8 +24,7 @@ vi.mock('electron', () => {
   }
 })
 
-const MIGRATION_001 = path.resolve(__dirname, '../../src/main/db/migrations/001_initial.sql')
-const MIGRATION_002 = path.resolve(__dirname, '../../src/main/db/migrations/002_alert_rules.sql')
+const MIGRATIONS_DIR = path.resolve(__dirname, '../../src/main/db/migrations')
 
 describe('Alert rules integration — polling gate', () => {
   let db: Database.Database
@@ -36,8 +35,10 @@ describe('Alert rules integration — polling gate', () => {
     db = new Database(':memory:')
     db.pragma('journal_mode = WAL')
     db.pragma('foreign_keys = ON')
-    db.exec(fs.readFileSync(MIGRATION_001, 'utf-8'))
-    db.exec(fs.readFileSync(MIGRATION_002, 'utf-8'))
+    const migrationFiles = fs.readdirSync(MIGRATIONS_DIR).filter(f => f.endsWith('.sql')).sort()
+    for (const file of migrationFiles) {
+      db.exec(fs.readFileSync(path.join(MIGRATIONS_DIR, file), 'utf-8'))
+    }
 
     // Seed hierarchy + device
     db.prepare("INSERT INTO regions (id, name) VALUES ('r1', 'Region 1')").run()

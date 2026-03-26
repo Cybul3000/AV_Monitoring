@@ -52,7 +52,8 @@ function applyMigrations(db: Database.Database): void {
     { version: 3, file: '003_zoom_location.sql' },
     { version: 4, file: '004_biamp_configs.sql' },
     { version: 5, file: '005_dante.sql' },
-    { version: 6, file: '006_alert_expected_value.sql' }
+    { version: 6, file: '006_alert_expected_value.sql' },
+    { version: 7, file: '007_device_options.sql' }
   ]
 
   for (const migration of migrationFiles) {

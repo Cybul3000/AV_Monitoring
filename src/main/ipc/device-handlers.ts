@@ -60,16 +60,18 @@ export function registerDeviceHandlers(win: BrowserWindow): void {
 export function startPolling(win: BrowserWindow): void {
   _win = win
   const db = getDb()
-  const devices = db.prepare('SELECT id, device_type, host, port, poll_interval FROM devices').all() as Array<{
+  const devices = db.prepare('SELECT id, device_type, host, port, poll_interval, options_json FROM devices').all() as Array<{
     id: string
     device_type: string
     host: string
     port: number | null
     poll_interval: number
+    options_json: string | null
   }>
 
   for (const device of devices) {
-    void connectDevice(device.id, device.device_type, device.host, device.port)
+    const options = device.options_json ? JSON.parse(device.options_json) as Record<string, unknown> : undefined
+    void connectDevice(device.id, device.device_type, device.host, device.port, options)
     scheduleDevice(device.id, device.device_type, device.poll_interval)
   }
 }
@@ -105,13 +107,14 @@ export async function connectDevice(
   deviceId: string,
   deviceType: string,
   host: string,
-  port: number | null
+  port: number | null,
+  options?: Record<string, unknown>
 ): Promise<void> {
   const module = getModule(deviceType)
   if (!module) return
   console.log(`[device-handlers] connecting ${deviceType} ${deviceId} → ${host}:${port ?? 'default'}`)
   try {
-    await module.connect(deviceId, { host, port: port ?? undefined })
+    await module.connect(deviceId, { host, port: port ?? undefined, options })
     console.log(`[device-handlers] connected ${deviceId}`)
   } catch (err) {
     console.warn(`[device-handlers] connect failed for ${deviceId} (${deviceType}): ${err}`)

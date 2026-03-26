@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto'
 import type {
   DeviceModule,
   DeviceConfig,
@@ -7,6 +8,8 @@ import type {
 } from '../_base/DeviceModule'
 import { LGTCPTransport } from './LGTCPTransport'
 import type { LEDStatus } from '../_base/DeviceModule'
+import { getPreference } from '../../preferences'
+import { getDb } from '../../db/database'
 
 const DEFAULT_PORT = 9761
 const DEFAULT_POLL_INTERVAL_MS = 30_000
@@ -82,12 +85,27 @@ export class LGDisplayModule implements DeviceModule {
   async connect(deviceId: string, config: DeviceConfig): Promise<void> {
     const host = config.host ?? 'localhost'
     const port = config.port ?? DEFAULT_PORT
-    const setId = (config.options?.setId as number | undefined) ?? 0
+    const rawSetId = config.options?.setId
+    const setId = rawSetId !== undefined ? parseInt(String(rawSetId), 10) : 1
     const pollIntervalMs = (config.options?.pollInterval as number | undefined) ?? DEFAULT_POLL_INTERVAL_MS
 
     const transport = new LGTCPTransport()
-    transport.verbose = !!(process.env.ELECTRON_RENDERER_URL) // dev mode
+    transport.verbose = !!(process.env.ELECTRON_RENDERER_URL) // dev mode console output
     transport.setSetId(setId)
+
+    // Protocol trace: write TX/RX to the events table when pref:lgProtocolTrace is enabled
+    transport.onTrace = (dir, raw) => {
+      try {
+        const traceEnabled = (getPreference('pref:lgProtocolTrace') as boolean | undefined) ?? false
+        if (!traceEnabled) return
+        const db = getDb()
+        db.prepare(
+          `INSERT INTO events (id, device_id, severity, message, occurred_at) VALUES (?, ?, ?, ?, ?)`
+        ).run(randomUUID(), deviceId, 'INFO', `[LG ${dir}] ${raw}`, new Date().toISOString())
+      } catch {
+        // Non-fatal — DB may not be ready during teardown
+      }
+    }
 
     const initialState: LGDeviceState = {
       power: null,
@@ -202,9 +220,9 @@ export class LGDisplayModule implements DeviceModule {
         case 'screenMuteOff':
           return await this._sendLGCommand(device, 'kd', setId, '00')
         case 'volumeMuteOn':
-          return await this._sendLGCommand(device, 'ke', setId, '01')
-        case 'volumeMuteOff':
           return await this._sendLGCommand(device, 'ke', setId, '00')
+        case 'volumeMuteOff':
+          return await this._sendLGCommand(device, 'ke', setId, '01')
         case 'setVolume': {
           const level = params?.level as number | undefined
           if (level === undefined) return { success: false, error: 'level param required' }
@@ -241,7 +259,8 @@ export class LGDisplayModule implements DeviceModule {
   }
 
   private _getSetIdHex(device: ConnectedDevice): string {
-    const setId = (device.config.options?.setId as number | undefined) ?? 0
+    const rawSetId = device.config.options?.setId
+    const setId = rawSetId !== undefined ? parseInt(String(rawSetId), 10) : 1
     return setId.toString(16).padStart(2, '0').toUpperCase()
   }
 
@@ -269,6 +288,10 @@ export class LGDisplayModule implements DeviceModule {
   private async _pollDevice(deviceId: string): Promise<void> {
     const device = this._devices.get(deviceId)
     if (!device) return
+
+    // Sync verbose flag with preference so console output follows the toggle live
+    const traceEnabled = (getPreference('pref:lgProtocolTrace') as boolean | undefined) ?? false
+    device.transport.verbose = traceEnabled || !!(process.env.ELECTRON_RENDERER_URL)
 
     // ka ff — power state
     try {
@@ -305,7 +328,7 @@ export class LGDisplayModule implements DeviceModule {
     try {
       const volMuteRes = await device.transport.send('ke', 'ff')
       if (volMuteRes.ok) {
-        device.state.volumeMute = parseInt(volMuteRes.value, 16) === 0x01
+        device.state.volumeMute = parseInt(volMuteRes.value, 16) === 0x00
       } else {
         console.warn(`[LGDisplayModule] NG on volume mute query for ${deviceId}`)
       }

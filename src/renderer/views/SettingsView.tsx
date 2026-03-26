@@ -29,6 +29,7 @@ export const SettingsView: React.FC = () => {
   const [failuresError, setFailuresError] = useState<string | null>(null)
 
   const [tooltipsEnabled, setTooltipsEnabled] = useState<boolean>(true)
+  const [lgProtocolTrace, setLgProtocolTrace] = useState<boolean>(false)
 
   // ── Zoom API Credentials ──────────────────────────────────────────────────
   const [zoomAccountId, setZoomAccountId] = useState('')
@@ -49,10 +50,11 @@ export const SettingsView: React.FC = () => {
   useEffect(() => {
     const load = async () => {
       try {
-        const [pollRes, failRes, tooltipRes, zoomRes] = await Promise.all([
+        const [pollRes, failRes, tooltipRes, traceRes, zoomRes] = await Promise.all([
           api().preferencesGet({ key: 'pref:pollIntervalDefault' }),
           api().preferencesGet({ key: 'pref:consecutiveFailuresBeforeRed' }),
           api().preferencesGet({ key: 'pref:tooltipsEnabled' }),
+          api().preferencesGet({ key: 'pref:lgProtocolTrace' }),
           api().zoomGetCredentials()
         ])
         setZoomAccountId(zoomRes.accountId)
@@ -66,6 +68,9 @@ export const SettingsView: React.FC = () => {
         }
         if (typeof tooltipRes.value === 'boolean') {
           setTooltipsEnabled(tooltipRes.value as boolean)
+        }
+        if (typeof traceRes.value === 'boolean') {
+          setLgProtocolTrace(traceRes.value as boolean)
         }
       } catch {
         // ignore load errors
@@ -101,6 +106,11 @@ export const SettingsView: React.FC = () => {
   const handleTooltipsToggle = (checked: boolean) => {
     setTooltipsEnabled(checked)
     void api().preferencesSet({ key: 'pref:tooltipsEnabled', value: checked })
+  }
+
+  const handleLgProtocolTraceToggle = (checked: boolean) => {
+    setLgProtocolTrace(checked)
+    void api().preferencesSet({ key: 'pref:lgProtocolTrace', value: checked })
   }
 
   // ── Zoom credential handler ───────────────────────────────────────────────
@@ -346,6 +356,26 @@ export const SettingsView: React.FC = () => {
             {importToast.ok ? `✓ ${importToast.message}` : importToast.message}
           </div>
         )}
+      </section>
+
+      {/* ── Debug ── */}
+      <section style={styles.section}>
+        <h3 style={styles.sectionTitle}>Debug</h3>
+        <div style={styles.fieldRow}>
+          <label style={styles.label} htmlFor="lg-protocol-trace">
+            <div>LG Protocol Trace</div>
+            <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', fontWeight: 400, marginTop: 2 }}>
+              Log all TX/RX bytes to the Event Logs tab. Takes effect on the next poll cycle.
+            </div>
+          </label>
+          <input
+            id="lg-protocol-trace"
+            type="checkbox"
+            checked={lgProtocolTrace}
+            onChange={e => handleLgProtocolTraceToggle(e.target.checked)}
+            style={{ width: 18, height: 18, cursor: 'pointer', marginTop: 8 }}
+          />
+        </div>
       </section>
 
       {showImportConfirm && (

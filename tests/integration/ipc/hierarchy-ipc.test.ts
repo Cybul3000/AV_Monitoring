@@ -21,7 +21,7 @@ vi.mock('electron', () => {
   }
 })
 
-const MIGRATION_PATH = path.resolve(__dirname, '../../../src/main/db/migrations/001_initial.sql')
+const MIGRATIONS_DIR = path.resolve(__dirname, '../../../src/main/db/migrations')
 
 async function invokeHandler(channel: string, payload: unknown): Promise<unknown> {
   const { ipcMain } = await import('electron')
@@ -40,7 +40,10 @@ describe('hierarchy IPC handlers', () => {
     db = new Database(dbPath)
     db.pragma('journal_mode = WAL')
     db.pragma('foreign_keys = ON')
-    db.exec(fs.readFileSync(MIGRATION_PATH, 'utf-8'))
+    const migrationFiles = fs.readdirSync(MIGRATIONS_DIR).filter(f => f.endsWith('.sql')).sort()
+    for (const file of migrationFiles) {
+      db.exec(fs.readFileSync(path.join(MIGRATIONS_DIR, file), 'utf-8'))
+    }
 
     // Override the db module to use our test DB
     vi.doMock('../../../src/main/db/database', () => ({

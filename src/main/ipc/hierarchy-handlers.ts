@@ -174,9 +174,10 @@ function handleUpdate(req: HierarchyUpdateRequest): HierarchyUpdateResponse {
         if (duplicate) {
           return { success: false, error: `Host ${d.host} is already used by "${duplicate.name}" in ${duplicate.room_name}` }
         }
+        const optionsJson = d.config ? JSON.stringify(d.config) : null
         db.prepare(
-          `INSERT INTO devices (id, room_id, device_type, name, host, port, web_ui_url, poll_interval, map_x, map_y, created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+          `INSERT INTO devices (id, room_id, device_type, name, host, port, web_ui_url, poll_interval, map_x, map_y, options_json, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
         ).run(
           id,
           req.parentId,
@@ -188,13 +189,15 @@ function handleUpdate(req: HierarchyUpdateRequest): HierarchyUpdateResponse {
           d.pollInterval ?? 30000,
           d.mapX ?? null,
           d.mapY ?? null,
+          optionsJson,
           now,
           now
         )
         // Seed default alert rules for the newly created device type
         onDeviceCreated(d.deviceType as string)
         // Connect the module and start polling for the new device
-        void connectDevice(id, d.deviceType as string, d.host as string, (d.port as number | undefined) ?? null)
+        const deviceOptions = d.config as Record<string, unknown> | undefined
+        void connectDevice(id, d.deviceType as string, d.host as string, (d.port as number | undefined) ?? null, deviceOptions)
         scheduleDevice(id, d.deviceType as string, (d.pollInterval as number | undefined) ?? 30000)
         return { success: true, id }
       }
@@ -294,4 +297,4 @@ interface DbRegion { id: string; name: string; led_status: string }
 interface DbOffice { id: string; region_id: string; name: string; city: string; led_status: string }
 interface DbFloor { id: string; office_id: string; level: number; name: string; floor_map_path: string | null; led_status: string }
 interface DbRoom { id: string; floor_id: string; name: string; map_x: number | null; map_y: number | null; map_w: number | null; map_h: number | null; led_status: string }
-interface DbDevice { id: string; room_id: string; device_type: string; name: string; host: string; port: number | null; web_ui_url: string | null; status: string; last_seen: string | null; poll_interval: number; map_x: number | null; map_y: number | null }
+interface DbDevice { id: string; room_id: string; device_type: string; name: string; host: string; port: number | null; web_ui_url: string | null; status: string; last_seen: string | null; poll_interval: number; map_x: number | null; map_y: number | null; options_json: string | null }

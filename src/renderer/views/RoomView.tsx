@@ -68,7 +68,7 @@ export const RoomView: React.FC<Props> = ({ regionId, officeId, floorId, roomId 
   const handleAddDevice = async (data: { name: string; deviceType: string; host: string; port?: number; credentials?: Record<string, string>; config?: Record<string, unknown> }) => {
     await update({
       action: 'create', type: 'device', parentId: roomId,
-      data: { name: data.name, deviceType: data.deviceType, host: data.host, port: data.port }
+      data: { name: data.name, deviceType: data.deviceType, host: data.host, port: data.port, config: data.config }
     })
     setShowAddDevice(false)
   }

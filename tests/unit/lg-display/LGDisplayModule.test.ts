@@ -47,8 +47,8 @@ function mockFullPollConnectedPowerOn() {
   mockTransportInstance.send
     .mockResolvedValueOnce({ ok: true, value: '01', rawValue: 'a 0 OK01x' }) // power on
     .mockResolvedValueOnce({ ok: true, value: '40', rawValue: 'b 0 OK40x' }) // input HDMI 1
-    .mockResolvedValueOnce({ ok: true, value: '00', rawValue: 'd 0 OK00x' }) // screen mute off
-    .mockResolvedValueOnce({ ok: true, value: '00', rawValue: 'e 0 OK00x' }) // volume mute off
+    .mockResolvedValueOnce({ ok: true, value: '00', rawValue: 'd 0 OK00x' }) // screen mute off (0x00 = not muted)
+    .mockResolvedValueOnce({ ok: true, value: '01', rawValue: 'e 0 OK01x' }) // volume mute off (0x01 = not muted)
     .mockResolvedValueOnce({ ok: true, value: '32', rawValue: 'f 0 OK32x' }) // volume 50
 }
 
@@ -56,8 +56,8 @@ function mockFullPollConnectedPowerOff() {
   mockTransportInstance.send
     .mockResolvedValueOnce({ ok: true, value: '00', rawValue: 'a 0 OK00x' }) // power off
     .mockResolvedValueOnce({ ok: true, value: '40', rawValue: 'b 0 OK40x' })
-    .mockResolvedValueOnce({ ok: true, value: '00', rawValue: 'd 0 OK00x' })
-    .mockResolvedValueOnce({ ok: true, value: '00', rawValue: 'e 0 OK00x' })
+    .mockResolvedValueOnce({ ok: true, value: '00', rawValue: 'd 0 OK00x' }) // screen mute off (0x00 = not muted)
+    .mockResolvedValueOnce({ ok: true, value: '01', rawValue: 'e 0 OK01x' }) // volume mute off (0x01 = not muted)
     .mockResolvedValueOnce({ ok: true, value: '32', rawValue: 'f 0 OK32x' })
 }
 
@@ -157,7 +157,7 @@ describe('LGDisplayModule', () => {
       // Use command-specific mock so both the fire-and-forget poll and
       // the timed poll return consistent values regardless of call order
       mockTransportInstance.send.mockImplementation((cmd: string) => {
-        const vals: Record<string, string> = { ka: '01', xb: '40', kd: '00', ke: '00', kf: '32' }
+        const vals: Record<string, string> = { ka: '01', xb: '40', kd: '00', ke: '01', kf: '32' }
         const v = vals[cmd] ?? '01'
         return Promise.resolve({ ok: true, value: v, rawValue: `a 0 OK${v}x` })
       })
@@ -177,7 +177,7 @@ describe('LGDisplayModule', () => {
 
     it('returns AMBER when power=off', async () => {
       mockTransportInstance.send.mockImplementation((cmd: string) => {
-        const vals: Record<string, string> = { ka: '00', xb: '40', kd: '00', ke: '00', kf: '32' }
+        const vals: Record<string, string> = { ka: '00', xb: '40', kd: '01', ke: '01', kf: '32' }
         const v = vals[cmd] ?? '00'
         return Promise.resolve({ ok: true, value: v, rawValue: `a 0 OK${v}x` })
       })
@@ -261,28 +261,28 @@ describe('LGDisplayModule', () => {
       expect(result.error).toMatch(/inputCode/)
     })
 
-    it('screenMuteOn sends kd with data 01', async () => {
+    it('screenMuteOn sends kd with data 01 (0x01 = mute active)', async () => {
       mockTransportInstance.send.mockResolvedValue(makeOkSend('01'))
       await mod.sendCommand(DEVICE_ID, 'screenMuteOn')
       expect(mockTransportInstance.send).toHaveBeenCalledWith('kd', '01')
     })
 
-    it('screenMuteOff sends kd with data 00', async () => {
+    it('screenMuteOff sends kd with data 00 (0x00 = mute inactive)', async () => {
       mockTransportInstance.send.mockResolvedValue(makeOkSend('00'))
       await mod.sendCommand(DEVICE_ID, 'screenMuteOff')
       expect(mockTransportInstance.send).toHaveBeenCalledWith('kd', '00')
     })
 
-    it('volumeMuteOn sends ke with data 01', async () => {
-      mockTransportInstance.send.mockResolvedValue(makeOkSend('01'))
+    it('volumeMuteOn sends ke with data 00 (0x00 = mute active)', async () => {
+      mockTransportInstance.send.mockResolvedValue(makeOkSend('00'))
       await mod.sendCommand(DEVICE_ID, 'volumeMuteOn')
-      expect(mockTransportInstance.send).toHaveBeenCalledWith('ke', '01')
+      expect(mockTransportInstance.send).toHaveBeenCalledWith('ke', '00')
     })
 
-    it('volumeMuteOff sends ke with data 00', async () => {
-      mockTransportInstance.send.mockResolvedValue(makeOkSend('00'))
+    it('volumeMuteOff sends ke with data 01 (0x01 = mute inactive)', async () => {
+      mockTransportInstance.send.mockResolvedValue(makeOkSend('01'))
       await mod.sendCommand(DEVICE_ID, 'volumeMuteOff')
-      expect(mockTransportInstance.send).toHaveBeenCalledWith('ke', '00')
+      expect(mockTransportInstance.send).toHaveBeenCalledWith('ke', '01')
     })
 
     it('setVolume(75) sends kf with hex 4b', async () => {

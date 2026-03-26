@@ -88,6 +88,20 @@
 
 ---
 
+## Phase 8: Post-integration Fixes & Enhancements
+
+- [X] T025 Fix `_drainBuffer()` — replace `\r`/`\n` line-split with regex pattern scan (`MSG_RE`) to handle LG displays that terminate with `x` only, no CR/LF in `src/main/modules/lg-display/LGTCPTransport.ts`
+- [X] T026 Fix `_handleLine()` regex — allow zero-or-more hex digits after OK/NG to parse `"NGx"` firmware variant (no data bytes) in `src/main/modules/lg-display/LGTCPTransport.ts`
+- [X] T027 Fix volume mute (`ke`) polarity — `0x00` = muted, `0x01` = not muted (reversed vs screen mute convention) in `src/main/modules/lg-display/LGDisplayModule.ts`
+- [X] T028 Add configurable Set ID — `setId` configField in device-registry, `options_json` column (migration 007), end-to-end options pipeline from form → DB → `module.connect()` in `resources/device-registry.json`, `src/main/db/migrations/007_device_options.sql`, `src/main/ipc/hierarchy-handlers.ts`, `src/main/ipc/device-handlers.ts`
+- [X] T029 Fix `config` dropped in Add Device handlers — pass `data.config` in `ConfigView.tsx` and `RoomView.tsx` `handleAdd` calls in `src/renderer/views/ConfigView.tsx`, `src/renderer/views/RoomView.tsx`
+- [X] T030 Add LG protocol trace toggle — `onTrace` callback writes TX/RX to `events` table when `pref:lgProtocolTrace` is enabled; Settings > Debug checkbox in `src/main/modules/lg-display/LGDisplayModule.ts`, `src/main/modules/lg-display/LGTCPTransport.ts`, `src/renderer/views/SettingsView.tsx`
+- [X] T031 [P] Write unit tests for `LGTCPTransport` — bare-x, CR, CRLF, NGx (no data), zero-padded setId, setSetId formatting in `tests/unit/lg-display/LGTCPTransport.test.ts`
+- [X] T032 [P] Fix integration test DB setup — apply all migrations in order instead of cherry-picked files in `tests/integration/alert-rules.test.ts`, `tests/integration/ipc/hierarchy-ipc.test.ts`
+- [X] T033 Run full test suite (`npm test`) — verify all 294 tests pass
+
+---
+
 ## Dependencies & Execution Order
 
 - **Phase 1–2**: Setup and transport layer — T006 blocks all module tasks

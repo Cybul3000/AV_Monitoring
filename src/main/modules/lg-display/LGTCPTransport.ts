@@ -23,10 +23,16 @@ export interface CommandResponse {
 //
 // Protocol framing:
 //   Send:    `{command_code} {setId_2hex} {data_2hex}\r`
-//   Receive: `{cmd_char} {setId_dec} OK{value_2hex}x\r`
-//         or `{cmd_char} {setId_dec} NG{value_2hex}x\r`
+//   Receive: `{cmd_char} {setId_dec} OK{value_hex}x`
+//         or `{cmd_char} {setId_dec} NG{value_hex}x`
+//   The trailing 'x' is the end-of-message marker. No CR/LF is guaranteed;
+//   some firmware appends \r or \r\n, others send nothing after 'x'.
 //
 // One command is sent at a time; the response is matched by cmd_char.
+//
+// Protocol tracing:
+//   Set `onTrace` to receive every TX/RX line. Used by LGDisplayModule to write
+//   trace events to the DB when pref:lgProtocolTrace is enabled.
 export class LGTCPTransport extends EventEmitter {
   private _socket: net.Socket | null = null
   private _host = ''
@@ -39,6 +45,8 @@ export class LGTCPTransport extends EventEmitter {
   private _backoffMs = INITIAL_BACKOFF_MS
   private _reconnectTimer: ReturnType<typeof setTimeout> | null = null
   verbose = false
+  /** Called for every TX/RX line regardless of pending state. Used for protocol tracing. */
+  onTrace: ((dir: 'TX' | 'RX', raw: string) => void) | null = null
 
   // connect() establishes the TCP connection and resolves once the 'connect'
   // event fires. Auto-reconnect is enabled for subsequent disconnects.
@@ -68,6 +76,12 @@ export class LGTCPTransport extends EventEmitter {
     })
 
     socket.on('data', (chunk: Buffer) => {
+      if (this.verbose) {
+        // Log raw bytes as hex + printable so we can see the actual terminator
+        const hex = chunk.toString('hex').replace(/../g, '$& ').trimEnd()
+        const asc = chunk.toString('ascii').replace(/[\r\n]/g, c => c === '\r' ? '<CR>' : '<LF>')
+        console.log(`[LGTCPTransport] RAW: ${asc}  [${hex}]`)
+      }
       this._buffer += chunk.toString('ascii')
       this._drainBuffer()
     })
@@ -135,6 +149,7 @@ export class LGTCPTransport extends EventEmitter {
 
         const line = `${commandCode} ${this._formatSetId()} ${data}\r`
         if (this.verbose) console.log(`[LGTCPTransport] SEND: ${JSON.stringify(line)}`)
+        this.onTrace?.('TX', line.trimEnd())
 
         const timer = setTimeout(() => {
           if (this._pending?.commandChar === cmdChar) {
@@ -169,25 +184,36 @@ export class LGTCPTransport extends EventEmitter {
   }
 
   private _drainBuffer(): void {
-    let cr: number
-    // Responses are terminated by \r
-    while ((cr = this._buffer.indexOf('\r')) !== -1) {
-      const line = this._buffer.slice(0, cr)
-      this._buffer = this._buffer.slice(cr + 1)
-      if (line.trim()) this._handleLine(line)
+    // LG responses end with 'x' as the last byte — no line terminator is guaranteed.
+    // Some firmware appends \r or \r\n, others send nothing after 'x'.
+    // Scan for the complete response pattern directly in the accumulated buffer.
+    const MSG_RE = /[a-z]\s+\d+\s+(?:OK|NG)[0-9a-fA-F]*x/g
+    let match: RegExpExecArray | null
+    let lastEnd = 0
+    while ((match = MSG_RE.exec(this._buffer)) !== null) {
+      this._handleLine(match[0])
+      lastEnd = match.index + match[0].length
     }
+    if (lastEnd > 0) {
+      // Discard processed bytes; keep any trailing partial data for the next chunk
+      this._buffer = this._buffer.slice(lastEnd)
+    }
+    // Safety: discard oversized stale buffer (e.g. garbage from connection noise)
+    if (this._buffer.length > 512) this._buffer = ''
   }
 
   // _handleLine parses one complete response line.
-  // Format: `{cmd_char} {setId_dec} OK{value_2hex}x` or `{cmd_char} {setId_dec} NG{value_2hex}x`
+  // Format: `{cmd_char} {setId_dec} OK{value_hex}x` or `{cmd_char} {setId_dec} NG{value_hex}x`
+  // Note: some firmware omits the data bytes on NG, e.g. "a 01 NGx" — value is empty string in that case.
   private _handleLine(line: string): void {
     if (this.verbose) console.log(`[LGTCPTransport] RECV: ${JSON.stringify(line)}`)
 
-    if (!this._pending) return
-
     const trimmed = line.trim()
-    // Expected: e.g. "a 0 OKffx" or "a 0 NG00x"
-    const match = /^([a-z])\s+\d+\s+(OK|NG)([0-9a-fA-F]{2})/.exec(trimmed)
+    this.onTrace?.('RX', trimmed)
+
+    if (!this._pending) return
+    // Matches e.g. "a 0 OKffx", "a 0 NG00x", or "a 01 NGx" (no data bytes on NG)
+    const match = /^([a-z])\s+\d+\s+(OK|NG)([0-9a-fA-F]*)x/.exec(trimmed)
     if (!match) return
 
     const [, responseCmdChar, status, value] = match

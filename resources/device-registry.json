@@ -20,7 +20,8 @@
       "protocol": "TCP",
       "port": 9761,
       "configFields": [
-        { "key": "host", "label": "IP Address", "secret": false }
+        { "key": "host", "label": "IP Address", "secret": false },
+        { "key": "setId", "label": "Set ID", "type": "number", "secret": false, "hint": "Display Set ID (1–99). Must match the ID configured on the display. Broadcast ID (0) does not respond to read queries." }
       ]
     },
     {
