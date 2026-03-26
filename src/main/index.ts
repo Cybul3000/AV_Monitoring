@@ -13,6 +13,7 @@ import { registerZoomHandlers } from './ipc/zoom-handlers'
 import { registerSettingsHandlers } from './ipc/settings-handlers'
 import { registerAlertHandlers } from './ipc/alert-handlers'
 import { registerDanteHandlers } from './ipc/dante-handlers'
+import { registerSSHHandlers } from './ipc/ssh-handlers'
 import { buildMenu } from './menu'
 import { createTray } from './tray'
 import { getPreference, setPreference } from './preferences'
@@ -82,6 +83,7 @@ function createWindow(): void {
   registerSettingsHandlers()
   registerAlertHandlers()
   registerDanteHandlers(mainWindow)
+  registerSSHHandlers(mainWindow)
 
   // Start device polling
   startPolling(mainWindow)

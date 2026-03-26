@@ -5,6 +5,7 @@ import type { DeviceModule } from './_base/DeviceModule'
 import { alertRulesService } from '../services/AlertRulesService'
 import { ZoomModule } from './zoom/ZoomModule'
 import { LGDisplayModule } from './lg-display/LGDisplayModule'
+import { CrestronSSHModule } from './crestron-ssh/CrestronSSHModule'
 import { LightwareModule } from './lightware/LightwareModule'
 import { BiampTesiraModule } from './biamp-tesira/BiampTesiraModule'
 import { DanteModule } from './dante/DanteModule'
@@ -106,8 +107,7 @@ export function registerAllModules(): void {
   registerModule('zoom-room', () => new ZoomModule())
 
   registerModule('lg-display', () => new LGDisplayModule())
-  // const { CrestronSSHModule } = require('./crestron-ssh/CrestronSSHModule')
-  // registerModule('crestron-ssh', () => new CrestronSSHModule())
+  registerModule('crestron-ssh', () => new CrestronSSHModule())
   registerModule('lightware-matrix', () => new LightwareModule())
   registerModule('biamp-tesira', () => new BiampTesiraModule())
   registerModule('dante-network-audio', () => new DanteModule())

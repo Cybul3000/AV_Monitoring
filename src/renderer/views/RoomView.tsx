@@ -7,6 +7,7 @@ import { LGDisplayPanel } from '../components/DeviceDetail/LGDisplayPanel/LGDisp
 import { LightwarePanel } from '../components/DeviceDetail/LightwarePanel/LightwarePanel'
 import { BiampTesiraPanel } from '../components/DeviceDetail/BiampTesiraPanel/BiampTesiraPanel'
 import { DantePanel } from '../components/DantePanel/DantePanel'
+import { SSHWorkspace } from '../components/SSHWorkspace/SSHWorkspace'
 import { useHierarchy } from '../hooks/useHierarchy'
 import { useDeviceStatus } from '../hooks/useDeviceStatus'
 import type { HierarchyNode } from '@shared/ipc-types'
@@ -214,6 +215,16 @@ export const RoomView: React.FC<Props> = ({ regionId, officeId, floorId, roomId 
               {selectedDevice.deviceType === 'dante-network-audio' && (
                 <div style={{ marginTop: 'var(--spacing-lg)' }}>
                   <DantePanel />
+                </div>
+              )}
+
+              {selectedDevice.deviceType === 'crestron-ssh' && (
+                <div style={{ marginTop: 'var(--spacing-lg)' }}>
+                  <SSHWorkspace
+                    deviceId={selectedDevice.id}
+                    deviceName={selectedDevice.name}
+                    deviceType={selectedDevice.deviceType}
+                  />
                 </div>
               )}
             </div>
